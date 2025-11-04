@@ -217,18 +217,26 @@ class LisFileParser {
     for (int i = newTable.length - 1; i >= 0; --i) {
       final row = newTable[i];
       final rawTime = row['TIME'];
-      if (rawTime == null) {
+
+      // Xóa row nếu TIME NULL hoặc không hợp lệ
+      if (rawTime == null || rawTime == 'NULL') {
+        newTable.removeAt(i);
         continue;
       }
+
       double? timeNum;
       if (rawTime is num) {
         timeNum = rawTime.toDouble();
       } else {
         timeNum = double.tryParse(rawTime.toString());
       }
+
+      // Xóa row nếu TIME không parse được
       if (timeNum == null) {
+        newTable.removeAt(i);
         continue;
       }
+
       final timeVal = (timeNum / 1000).toString();
       if (timeToDepth.containsKey(timeVal)) {
         final newDepth = timeToDepth[timeVal];
@@ -236,15 +244,27 @@ class LisFileParser {
           newTable[i][targetCol] = newDepth;
         }
       } else {
+        // Xóa row nếu TIME không khớp với TXT
         newTable.removeAt(i);
       }
     }
     // Print the first row if available
     if (newTable.isNotEmpty) {
+      print('[DEBUG] After merge: ${newTable.length} rows remaining');
       print('[DEBUG] First row after merge: ${newTable.first}');
+
+      // Count TIME NULL
+      int nullCount = 0;
+      for (var row in newTable) {
+        if (row['TIME'] == null || row['TIME'] == 'NULL') {
+          nullCount++;
+        }
+      }
+      print('[DEBUG] Rows with TIME NULL: $nullCount/${newTable.length}');
     } else {
       print('[DEBUG] tableData after merge is empty');
     }
+
     // Chuẩn hóa dữ liệu sau khi merge
     normalizeTableData(newTable, columnNames);
     return newTable;
@@ -256,6 +276,27 @@ class LisFileParser {
     List<String> columnNames,
   ) {
     if (data.isEmpty || data.length < 2) return;
+
+    //Xử lý bỏ tất cả các row có TIME NULL
+    print(
+      '[DEBUG][normalizeTableData] Before removeWhere: ${data.length} rows',
+    );
+    data.removeWhere((row) {
+      final timeValue = row['TIME'];
+      final isNull =
+          timeValue == null ||
+          timeValue == 'NULL' ||
+          timeValue.toString().trim().isEmpty;
+      return isNull;
+    });
+    print('[DEBUG][normalizeTableData] After removeWhere: ${data.length} rows');
+
+    if (data.isEmpty) {
+      print(
+        '[DEBUG][normalizeTableData] All rows had NULL TIME, no data to normalize',
+      );
+      return;
+    }
 
     // 1. Xác định xu hướng chính (tăng hoặc giảm)
     final deptCol = _resolveDepthColumn(columnNames);
@@ -2915,6 +2956,8 @@ class LisFileParser {
       throw Exception('No file is open');
     }
 
+    normalizeTableData(tableData, columnNames);
+
     // Get original file bytes up to startAdrSave
     final originalBytes = await file!.getAllBytes();
 
@@ -2924,7 +2967,8 @@ class LisFileParser {
 
     // Calculate total bytes to write from tableData
     int totalBytesToWrite = tableData.length * entryBlock.nDataFrameSize;
-
+    print('tableData: ${tableData.length}');
+    print('dataFrame: ${entryBlock.nDataFrameSize}');
     // Calculate frame per record
     int framePerRecordNew = 1;
     for (int i = maxFramesPerRecord; i >= 1; i--) {
