@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+
 import '../models/lis_file_class.dart';
 
 class LisFileLoaderScreen extends StatefulWidget {
@@ -21,23 +22,33 @@ class _LisFileLoaderScreenState extends State<LisFileLoaderScreen> {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.any,
     );
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        filePath = result.files.single.path;
-        status = 'Đang load file...';
-      });
-      lisFileClass = LISFileClass(strFileName: filePath!);
-      await lisFileClass!.parse();
+    if (result != null) {
+      String? path;
+      try {
+        path = result.files.single.path;
+      } catch (e) {
+        // On web, path is not available
+        path = null;
+      }
 
-      await lisFileClass!.createLogicalFileArr();
-      await lisFileClass!.parseLogicalFile(0);
-      await lisFileClass!.createDataSet();
-      setState(() {
-        logicalRecordNum = lisFileClass!.lrArr.length;
-        logicalFileNum = lisFileClass!.logicalFileArr.length;
-        dataSetNum = lisFileClass!.datasetArr.length;
-        status = 'Đã load xong!';
-      });
+      if (path != null) {
+        setState(() {
+          filePath = path;
+          status = 'Đang load file...';
+        });
+        lisFileClass = LISFileClass(strFileName: filePath!);
+        await lisFileClass!.parse();
+
+        await lisFileClass!.createLogicalFileArr();
+        await lisFileClass!.parseLogicalFile(0);
+        await lisFileClass!.createDataSet();
+        setState(() {
+          logicalRecordNum = lisFileClass!.lrArr.length;
+          logicalFileNum = lisFileClass!.logicalFileArr.length;
+          dataSetNum = lisFileClass!.datasetArr.length;
+          status = 'Đã load xong!';
+        });
+      }
     }
   }
 

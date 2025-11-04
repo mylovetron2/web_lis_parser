@@ -9,6 +9,7 @@ import '../models/entry_block.dart';
 import '../models/file_header_record.dart';
 import '../models/lis_record.dart';
 import '../models/well_info_block.dart';
+import 'byte_file_reader.dart';
 import 'code_reader.dart';
 
 class LisFileParser {
@@ -61,7 +62,7 @@ class LisFileParser {
   late Uint8List byteData;
   late Float32List fileData;
 
-  RandomAccessFile? file;
+  ByteFileReader? file;
   int maxFramesPerRecord = 20;
 
   // Pending changes storage
@@ -78,16 +79,26 @@ class LisFileParser {
       ? 'NTI (Halliburton)'
       : 'LIS (Russian)';
 
-  Map<String, dynamic> get fileInfo => {
-    'fileName': fileName.split(Platform.pathSeparator).last,
-    'fileType': fileTypeString,
-    'recordCount': recordCount,
-    'startDepth': startDepth.toStringAsFixed(2),
-    'endDepth': endDepth.toStringAsFixed(2),
-    'direction': entryBlock.nDirection,
-    'frameSpacing': entryBlock.fFrameSpacing.toStringAsFixed(3),
-    'depthUnit': entryBlock.nOpticalDepthUnit,
-  };
+  Map<String, dynamic> get fileInfo {
+    // Extract filename - handle both web (/) and desktop (\\ or /) paths
+    String displayName = fileName;
+    if (displayName.contains('/')) {
+      displayName = displayName.split('/').last;
+    } else if (displayName.contains('\\')) {
+      displayName = displayName.split('\\').last;
+    }
+
+    return {
+      'fileName': displayName,
+      'fileType': fileTypeString,
+      'recordCount': recordCount,
+      'startDepth': startDepth.toStringAsFixed(2),
+      'endDepth': endDepth.toStringAsFixed(2),
+      'direction': entryBlock.nDirection,
+      'frameSpacing': entryBlock.fFrameSpacing.toStringAsFixed(3),
+      'depthUnit': entryBlock.nOpticalDepthUnit,
+    };
+  }
 
   // Pending changes storage
   LisFileParser() {
@@ -624,10 +635,11 @@ class LisFileParser {
     //CẬP NHẬT ENTRYBLOCK
 
     final updatedEntryBlock = EntryBlock();
-    if (stepChuanHoa < 0)
+    if (stepChuanHoa < 0) {
       updatedEntryBlock.nDirection = 255;
-    else
+    } else {
       updatedEntryBlock.nDirection = 1;
+    }
 
     updatedEntryBlock.fFrameSpacing = stepChuanHoa.abs() * 100;
     updatedEntryBlock.nDataFrameSize = entryBlock.nDataFrameSize;
@@ -1003,7 +1015,8 @@ class LisFileParser {
       await closeLisFile();
 
       fileName = filePath;
-      file = await File(filePath).open();
+      final randomAccessFile = await File(filePath).open();
+      file = ByteFileReader.fromFile(randomAccessFile);
       // File opened successfully
 
       if (onProgress != null) onProgress(10);
@@ -2794,7 +2807,10 @@ class LisFileParser {
       await File(newFileName).writeAsBytes(modifiedBytes);
       print('DEBUG: Written modified bytes to new file');
 
-      file = await File(newFileName).open(mode: FileMode.read);
+      final randomAccessFile = await File(
+        newFileName,
+      ).open(mode: FileMode.read);
+      file = ByteFileReader.fromFile(randomAccessFile);
       final newFileSize = await File(newFileName).length();
       print('New file size after write: $newFileSize bytes');
 
@@ -2831,108 +2847,286 @@ class LisFileParser {
     }
   }
 
-  /*
-  // Russian LIS Float Encoder (reprCode 68) - Exact reverse of C++ ReadCode
-  Uint8List _encodeRussianLisFloat(double value) {
-    if (value == 0.0) return Uint8List.fromList([0, 0, 0, 0]);
-    bool isNegative = value < 0;
-    double absValue = value.abs();
-    // Tìm E và M
-    int E = 0;
-    double M = 0;
-    // Chỉ xử lý các giá trị là -32768.0, -16384.0, ...
-    // Tìm E sao cho absValue = 0.5 * 2^(127-E)
-    for (int e = 127; e >= 0; e--) {
-      double v = 0.5 * math.pow(2.0, 127 - e);
-      if ((absValue - v).abs() < 0.0001) {
-        E = e;
-        M = 0.5;
+  Future<void> openLisFileFromBytes(
+    Uint8List fileBytes, {
+    Function(double)? onProgress,
+  }) async {
+    try {
+      // Opening LIS file from bytes
+      await closeLisFile();
+
+      fileName = 'uploaded_file.lis'; // Default name for web uploads
+      file = ByteFileReader.fromBytes(fileBytes, fileName);
+      // File opened successfully from bytes
+
+      if (onProgress != null) onProgress(10);
+
+      // Detect file type (LIS or NTI)
+      await _detectFileType();
+      print(
+        'File type detected: ${fileType == LisConstants.fileTypeNti ? "NTI" : "LIS"}',
+      );
+
+      if (onProgress != null) onProgress(30);
+
+      if (fileType == LisConstants.fileTypeNti) {
+        await _openLIS(onProgress);
+      } else {
+        await _openLIS(onProgress);
+      }
+
+      // After parsing records and datum blocks, compute depth-related values
+      try {
+        final spacing = entryBlock.fFrameSpacing;
+        step = (spacing * 1000).round();
+      } catch (_) {
+        step = 0;
+      }
+
+      try {
+        startDepth = await _getStartDepth();
+      } catch (_) {
+        startDepth = 0.0;
+      }
+      try {
+        endDepth = await _getEndDepth();
+      } catch (_) {
+        endDepth = startDepth;
+      }
+
+      if (onProgress != null) onProgress(100);
+      isFileOpen = true;
+      // File parsing completed successfully from bytes
+    } catch (e) {
+      // Error opening LIS file from bytes: $e
+      rethrow;
+    }
+  }
+
+  /// Get modified file bytes for download (web-compatible)
+  /// This creates a new LIS file with the merged/edited data in memory
+  /// Using the same logic as saveTableData2Lis
+  Future<Uint8List> getModifiedFileBytes(
+    List<Map<String, dynamic>> tableData,
+    List<String> columnNames,
+    int startAdrSave,
+  ) async {
+    if (file == null) {
+      throw Exception('No file is open');
+    }
+
+    // Get original file bytes up to startAdrSave
+    final originalBytes = await file!.getAllBytes();
+
+    // Create output buffer with header part
+    final outputBuffer = BytesBuilder();
+    outputBuffer.add(originalBytes.sublist(0, startAdrSave));
+
+    // Calculate total bytes to write from tableData
+    int totalBytesToWrite = tableData.length * entryBlock.nDataFrameSize;
+
+    // Calculate frame per record
+    int framePerRecordNew = 1;
+    for (int i = maxFramesPerRecord; i >= 1; i--) {
+      if ((totalBytesToWrite / entryBlock.nDataFrameSize) % i == 0) {
+        framePerRecordNew = i;
         break;
       }
     }
-    if (M == 0) {
-      // Không encode được, trả về [0,0,0,0]
-      return Uint8List.fromList([0, 0, 0, 0]);
+
+    // Calculate number of records
+    int numRec =
+        (totalBytesToWrite / (framePerRecordNew * entryBlock.nDataFrameSize))
+            .ceil();
+
+    // Get preAdr from original file
+    await file!.setPosition(startAdrSave + 4);
+    final preAdrBytes = await file!.read(4);
+    int preAdr = ByteData.sublistView(preAdrBytes).getInt32(0, Endian.little);
+
+    int nextAdr =
+        startAdrSave + 16 + 6 + framePerRecordNew * entryBlock.nDataFrameSize;
+
+    print('[DEBUG] totalBytesToWrite: $totalBytesToWrite');
+    print('[DEBUG] framePerRecordNew: $framePerRecordNew');
+    print('[DEBUG] preAdr: $preAdr');
+    print('[DEBUG] nextAdr: $nextAdr');
+    print('[DEBUG] numRec: $numRec');
+    print('[DEBUG] length per record: ${entryBlock.nDataFrameSize}');
+
+    // Calculate depth for record
+    double depthRecord = 0.0;
+    var val = tableData.isNotEmpty ? tableData[0]['DEPT'] : null;
+    if (val is num) {
+      depthRecord = val.toDouble() * 100;
+    } else if (val is String && val != 'NULL') {
+      depthRecord = (double.tryParse(val) ?? 0.0) * 100;
     }
-    // Tính byte1, byte2, byte3, byte4
-    int byte1 = isNegative ? (E >> 1) | 0x80 : (E >> 1);
-    int byte2 = ((E & 1) << 7) | 0x40;
-    int byte3 = 0;
-    int byte4 = 0;
-    return Uint8List.fromList([byte1, byte2, byte3, byte4]);
-  }
-*/
-  /// Lưu dataRecord type 0 vào file LIS, chuyển đổi dữ liệu theo reprCode
-  /// Lưu tableData ra file, chuyển từng giá trị thành bytes theo reprCode của từng cột
-  Future<void> saveDataRecordsType0ToLIS({
-    required List<Map<String, dynamic>> tableData,
-    required List<String> columnOrder,
-    required Map<String, int> columnReprCodes,
-    required File fileLIS,
-  }) async {
-    final raf = await fileLIS.open(mode: FileMode.write);
-    for (int rowIdx = 0; rowIdx < tableData.length; rowIdx++) {
-      final row = tableData[rowIdx];
-      for (final col in columnOrder) {
-        final value = row[col];
-        final reprCode = columnReprCodes[col] ?? 68;
-        Uint8List bytes;
-        switch (reprCode) {
-          case 68: // 32-bit float
-            bytes = CodeReader.encode32BitFloat(
-              value is num
-                  ? value.toDouble()
-                  : double.tryParse(value.toString()) ?? 0.0,
+
+    int step = 0;
+
+    // Write all records
+    for (int i = 0; i < numRec; i++) {
+      // Write BLANK RECORD HEADER (16 bytes)
+      // 4 bytes: 0
+      final zeroBytes = ByteData(4);
+      zeroBytes.setInt32(0, 0, Endian.little);
+      outputBuffer.add(zeroBytes.buffer.asUint8List());
+
+      // 4 bytes: preAdr
+      outputBuffer.add(intToLittleEndianBytes(preAdr));
+
+      // 4 bytes: nextAdr
+      outputBuffer.add(intToLittleEndianBytes(nextAdr));
+
+      // 2 bytes: length
+      int lengthNew = framePerRecordNew * entryBlock.nDataFrameSize + 6 + 4;
+      final lengthBytes = ByteData(2);
+      lengthBytes.setInt16(0, lengthNew, Endian.big);
+      outputBuffer.add(lengthBytes.buffer.asUint8List());
+
+      // 2 bytes: 0
+      final zeroBytes2 = ByteData(2);
+      zeroBytes2.setInt16(0, 0, Endian.big);
+      outputBuffer.add(zeroBytes2.buffer.asUint8List());
+
+      // Write DATA RECORD HEADER (6 bytes)
+      // 2 bytes: record type = 0
+      final typeBytes = ByteData(2);
+      typeBytes.setInt16(0, 0, Endian.big);
+      outputBuffer.add(typeBytes.buffer.asUint8List());
+
+      // 4 bytes: depth record
+      final depthBytes = CodeReader.encode(
+        depthRecord,
+        entryBlock.nDepthRepr,
+        4,
+      );
+      outputBuffer.add(depthBytes);
+
+      depthRecord -= stepChuanHoa * 100;
+
+      // Write FRAME DATA
+      for (int frameIdx = 0; frameIdx < framePerRecordNew; frameIdx++) {
+        if (step >= tableData.length) break;
+
+        final row = tableData[step];
+
+        // Read Adr from tableData to get original frame data
+        final adr = row['Adr'];
+        if (adr != null) {
+          final parts = adr.toString().split(':');
+          if (parts.length == 2) {
+            final recordIdx = int.tryParse(parts[0]) ?? 0;
+            final frameIdxInRecord = int.tryParse(parts[1]) ?? 0;
+            final offset = calcFrameOffset(
+              recordIdx,
+              frameIdxInRecord,
+              entryBlock.nDataFrameSize,
             );
-            break;
-          case 73: // 32-bit int
-            int v;
-            if (value is int) {
-              v = value;
-            } else if (value is double) {
-              v = value.round();
-            } else {
-              v = int.tryParse(value.toString().split('.').first) ?? 0;
+
+            // Read original frame bytes
+            await file!.setPosition(offset);
+            final originalFrameBytes = await file!.read(
+              entryBlock.nDataFrameSize,
+            );
+
+            // Create mutable copy
+            final frameBytesCopy = Uint8List.fromList(originalFrameBytes);
+
+            // Update DEPT value in the frame (first 4 bytes)
+            final deptValue = row['DEPT'];
+            if (deptValue != null) {
+              final deptDatum = datumBlocks.firstWhere(
+                (d) => d.mnemonic == 'DEPT',
+                orElse: () => DatumSpecBlock.empty('DEPT'),
+              );
+
+              double deptDouble = 0.0;
+              if (deptValue is num) {
+                deptDouble = deptValue.toDouble();
+              } else if (deptValue is String && deptValue != 'NULL') {
+                deptDouble = double.tryParse(deptValue) ?? 0.0;
+              }
+
+              final deptBytes = CodeReader.encode(
+                deptDouble,
+                deptDatum.reprCode,
+                4,
+              );
+
+              // Replace first 4 bytes
+              for (int i = 0; i < 4 && i < deptBytes.length; i++) {
+                frameBytesCopy[i] = deptBytes[i];
+              }
             }
-            final bd = ByteData(4)..setInt32(0, v, Endian.big);
-            bytes = bd.buffer.asUint8List();
-            break;
-          case 79: // 16-bit int
-            int v;
-            if (value is int) {
-              v = value;
-            } else if (value is double) {
-              v = value.round();
-            } else {
-              v = int.tryParse(value.toString().split('.').first) ?? 0;
-            }
-            final bd = ByteData(2)..setInt16(0, v, Endian.big);
-            bytes = bd.buffer.asUint8List();
-            break;
-          case 65: // String
-            String s = value.toString();
-            bytes = Uint8List.fromList(
-              s.padRight(4).codeUnits.take(4).toList(),
-            );
-            break;
-          default:
-            bytes = CodeReader.encode32BitFloat(
-              value is num
-                  ? value.toDouble()
-                  : double.tryParse(value.toString()) ?? 0.0,
-            );
+
+            outputBuffer.add(frameBytesCopy);
+          }
         }
-        // Debug: In ra dạng byte
-        // Debug: In ra giá trị trước khi mã hóa thành bytes
-        print(
-          '[DEBUG][SAVE][VALUE] rowIdx=$rowIdx col=$col value=$value reprCode=$reprCode',
-        );
-        print(
-          '[DEBUG][SAVE][BYTES] rowIdx=$rowIdx col=$col bytes=${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
-        );
-        await raf.writeFrom(bytes);
+
+        step++;
       }
+
+      // Update preAdr and nextAdr for next record
+      preAdr = nextAdr - 16 - 6 - framePerRecordNew * entryBlock.nDataFrameSize;
+      nextAdr =
+          nextAdr + 16 + 6 + framePerRecordNew * entryBlock.nDataFrameSize;
     }
-    await raf.close();
+
+    // Update EntryBlock
+    final updatedEntryBlock = EntryBlock();
+    if (stepChuanHoa < 0) {
+      updatedEntryBlock.nDirection = 255;
+    } else {
+      updatedEntryBlock.nDirection = 1;
+    }
+
+    updatedEntryBlock.fFrameSpacing = stepChuanHoa.abs() * 100;
+    updatedEntryBlock.nDataFrameSize = entryBlock.nDataFrameSize;
+    updatedEntryBlock.nOpticalDepthUnit = 255;
+    updatedEntryBlock.strFrameSpacingUnit = 'CM';
+    updatedEntryBlock.strDepthUnit = 'CM';
+    updatedEntryBlock.strDataRefPointUnit = 'CM';
+    updatedEntryBlock.nDepthRepr = entryBlock.nDepthRepr;
+    updatedEntryBlock.nDepthRecordingMode = 1;
+
+    final updateEntryBlockBytes = encodeEntryBlock(updatedEntryBlock);
+    int fileOffset = lisRecords[dataFSRIdx].addr + 2;
+
+    // Insert updated EntryBlock into output
+    final finalBytes = outputBuffer.toBytes();
+    for (
+      int i = 0;
+      i < updateEntryBlockBytes.length && fileOffset + i < finalBytes.length;
+      i++
+    ) {
+      finalBytes[fileOffset + i] = updateEntryBlockBytes[i];
+    }
+
+    return finalBytes;
+  }
+
+  /// Get download filename with timestamp
+  String getDownloadFileName() {
+    final now = DateTime.now();
+    final timeStr =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+
+    // Extract base filename
+    String baseName = fileName;
+    if (baseName.contains('/')) {
+      baseName = baseName.split('/').last;
+    } else if (baseName.contains('\\')) {
+      baseName = baseName.split('\\').last;
+    }
+
+    // Remove extension
+    final extIndex = baseName.lastIndexOf('.');
+    if (extIndex > 0) {
+      baseName = baseName.substring(0, extIndex);
+    }
+
+    return '${baseName}_modified_$timeStr.lis';
   }
 }

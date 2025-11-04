@@ -1,9 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../services/lis_file_parser.dart';
-import 'all_data_viewer_screen.dart';
-import 'entry_block_screen.dart' show EntryBlockScreen;
 import 'lis_viewer_screen.dart';
 //import 'all_data_viewer_screen.dart';
 
@@ -33,9 +33,35 @@ class _HomeScreenState extends State<HomeScreen> {
         dialogTitle: 'Select LIS File',
       );
 
-      if (result != null && result.files.single.path != null) {
-        String filePath = result.files.single.path!;
+      if (result == null || result.files.isEmpty) return;
 
+      // Tự động chuyển đổi cho web: dùng bytes nếu không có path
+      String? filePath;
+      Uint8List? fileBytes;
+
+      // Try to get bytes first (works on both web and desktop)
+      fileBytes = result.files.single.bytes;
+
+      // Try to get path (only works on desktop, will be null on web)
+      try {
+        filePath = result.files.single.path;
+      } catch (e) {
+        // On web, accessing path throws an exception
+        filePath = null;
+      }
+
+      // Prioritize bytes (works on both web and desktop)
+      if (fileBytes != null) {
+        await _parser.openLisFileFromBytes(
+          fileBytes,
+          onProgress: (progress) {
+            setState(() {
+              _progress = progress;
+            });
+          },
+        );
+      } else if (filePath != null) {
+        // Fallback to path (desktop only)
         await _parser.openLisFile(
           filePath,
           onProgress: (progress) {
@@ -44,14 +70,17 @@ class _HomeScreenState extends State<HomeScreen> {
             });
           },
         );
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LisViewerScreen(parser: _parser),
-            ),
-          );
-        }
+      } else {
+        throw Exception('No file data available');
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LisViewerScreen(parser: _parser),
+          ),
+        );
       }
     } catch (e) {
       setState(() {
@@ -70,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('LIS File Parser'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: Colors.teal, // Đổi màu trên cùng thành màu teal
         actions: [
           IconButton(
             icon: const Icon(Icons.memory),
@@ -82,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -99,7 +128,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Parse and view Log Information Standard (LIS) files\nSupports both Russian LIS and Halliburton NTI formats',
+                //'Parse and view Log Information Standard (LIS) files\nSupports both Russian LIS and Halliburton NTI formats',
+                'Parse and view Log Information Standard (LIS) files',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
@@ -124,42 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    // Điều hướng sang màn hình EntryBlockScreen
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => EntryBlockScreen(
-                          entryBlock: _parser.entryBlock,
-                          parser: _parser,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text('Xem EntryBlock'),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/value-converter');
-                  },
-                  child: const Text('Value Converter'),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    // Điều hướng sang màn hình AllDataViewerScreen
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => AllDataViewerScreen(
-                          parser: _parser,
-                          currentDataRec: _parser.currentDataRec,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text('Xem dữ liệu thô (getAllData)'),
-                ),
+                // ...existing code...
               ],
               if (_errorMessage != null) ...[
                 const SizedBox(height: 24),

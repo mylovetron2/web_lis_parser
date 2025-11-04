@@ -3,9 +3,11 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../services/lis_file_parser.dart';
+import '../utils/file_download_helper.dart';
 import 'waveform_viewer_dialog.dart';
 
 class DataTableWidget extends StatefulWidget {
@@ -38,6 +40,85 @@ class _DataTableWidgetState extends State<DataTableWidget> {
     _loadTableData();
   }
 
+  // Download modified file
+  Future<void> _downloadModifiedFile() async {
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Đang chuẩn bị file để download...'),
+            ],
+          ),
+        ),
+      );
+
+      // Calculate startAdrSave - address of first blank record before data records
+      int startAdrSave = 0;
+      if (widget.parser.startDataRec > 0 &&
+          widget.parser.startDataRec < widget.parser.lisRecords.length) {
+        final firstDataRecord =
+            widget.parser.lisRecords[widget.parser.startDataRec];
+        // Blank record is 16 bytes before the data record
+        startAdrSave = firstDataRecord.addr - 16;
+      }
+
+      // Get modified bytes
+      final modifiedBytes = await widget.parser.getModifiedFileBytes(
+        tableData,
+        columnNames,
+        startAdrSave,
+      );
+
+      // Generate filename
+      final downloadFileName = widget.parser.getDownloadFileName();
+
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Trigger download
+      if (kIsWeb) {
+        FileDownloadHelper.downloadFile(modifiedBytes, downloadFileName);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đã download file: $downloadFileName'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Download chỉ khả dụng trên web browser'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading if still open
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi tạo file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   // Merge theo TIME: thay DEPTH trong LIS bằng DEPTH trong TXT
   Future<void> _mergeByTimeFromTxt() async {
     // Xác định cột độ sâu mục tiêu để merge
@@ -50,33 +131,28 @@ class _DataTableWidgetState extends State<DataTableWidget> {
         allowedExtensions: ['txt'],
       );
       if (result == null || result.files.isEmpty) return;
-      final txtPath = result.files.single.path;
-      if (txtPath == null) return;
-      final txtFile = await File(txtPath).readAsString();
+
+      // Handle both web (bytes) and desktop (path)
+      String txtContent;
+      if (result.files.single.bytes != null) {
+        // Web: read from bytes
+        txtContent = String.fromCharCodes(result.files.single.bytes!);
+      } else if (result.files.single.path != null) {
+        // Desktop: read from file
+        txtContent = await File(result.files.single.path!).readAsString();
+      } else {
+        throw Exception('Unable to read file');
+      }
 
       final merged = widget.parser.mergeDepthToTable(
-        txtContent: txtFile,
+        txtContent: txtContent,
         tableData: tableData,
         columnNames: columnNames,
       );
       int matchCount = merged.length; // Số dòng còn lại sau merge
 
-      // Thay thế diff bằng copyFramesToNewFile: copy các frame từ merged sang file mới
-      final frameLength = widget.parser.entryBlock.nDataFrameSize;
-      //await widget.parser.copyFramesToNewFile(merged, frameLength);
-      await widget.parser.saveTableData2Lis(
-        tableData: merged, // List<Map<String, dynamic>> dữ liệu bảng
-        columnNames: columnNames, // List<String> tên cột
-        startAdrSave: 30381,
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã copy các frame sang file mới!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // Update the table data in memory (works on both web and desktop)
       setState(() {
-        // Cập nhật lại bảng dữ liệu sau khi merge
         tableData = merged;
         currentPage = 0; // quay về trang đầu để dễ thấy thay đổi
         // Clear editing state after merge
@@ -84,14 +160,37 @@ class _DataTableWidgetState extends State<DataTableWidget> {
         editControllers.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Đã merge DEPTH từ TXT cho $matchCount dòng TIME khớp!',
+      // Note: File saving is not supported on web
+      // On desktop, you can uncomment the following to save changes:
+      // try {
+      //   await widget.parser.saveTableData2Lis(
+      //     tableData: merged,
+      //     columnNames: columnNames,
+      //     startAdrSave: 30381,
+      //   );
+      //   if (mounted) {
+      //     ScaffoldMessenger.of(context).showSnackBar(
+      //       SnackBar(
+      //         content: Text('Đã lưu thay đổi vào file!'),
+      //         backgroundColor: Colors.green,
+      //       ),
+      //     );
+      //   }
+      // } catch (e) {
+      //   print('Cannot save file (expected on web): $e');
+      // }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Đã merge DEPTH từ TXT cho $matchCount dòng TIME khớp! (Chỉ trong bộ nhớ - không lưu file trên web)',
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
           ),
-          backgroundColor: Colors.green,
-        ),
-      );
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi merge: $e'), backgroundColor: Colors.red),
@@ -295,6 +394,7 @@ class _DataTableWidgetState extends State<DataTableWidget> {
         content: Text(
           'This will permanently save ${widget.parser.pendingChangesCount} changes to the LIS file.\n\n'
           'A backup copy will be created automatically.\n\n'
+          '⚠️ Lưu ý: Lưu file không khả dụng trên web browser.\n\n'
           'Continue?',
         ),
         actions: [
@@ -331,7 +431,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
 
     try {
       // Save initiated
-
       final success = await widget.parser.savePendingChanges();
       // Save result: $success
 
@@ -361,13 +460,28 @@ class _DataTableWidgetState extends State<DataTableWidget> {
     } catch (e) {
       Navigator.of(context).pop(); // Close loading dialog
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error saving to file: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // Check if it's the expected web error
+      final errorMsg = e.toString();
+      if (errorMsg.contains('Unsupported') ||
+          errorMsg.contains('UnsupportedError')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Lưu file không khả dụng trên web. Thay đổi chỉ tồn tại trong bộ nhớ.',
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving to file: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -512,6 +626,16 @@ class _DataTableWidgetState extends State<DataTableWidget> {
                       onPressed: _mergeByTimeFromTxt,
                       icon: const Icon(Icons.merge_type),
                       tooltip: 'Merge DEPTH từ TXT theo TIME',
+                    ),
+                    const SizedBox(width: 8),
+                    // Download button
+                    IconButton(
+                      onPressed: _downloadModifiedFile,
+                      icon: const Icon(Icons.download),
+                      tooltip: 'Download file đã chỉnh sửa',
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.green.shade100,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     // Edit mode toggle
