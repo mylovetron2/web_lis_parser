@@ -143,6 +143,65 @@ class LisFileParser {
     return seconds;
   }
 
+  /// Hàm parseTimeLspdDepthMapFromTxt
+  /// ---------------------------------------------
+  /// Đọc nội dung file TXT, trích xuất cột TIME, DEPTH/DEPT và LSPD (nếu có),
+  /// trả về Map<String, Map<String, String>> với key là TIME (giây), value là map chứa DEPTH và LSPD.
+  /// Nếu không có LSPD, value chỉ chứa DEPTH.
+  Map<String, Map<String, String>> parseTimeLspdDepthMapFromTxt(
+    String txtContent,
+  ) {
+    final lines = txtContent
+        .split(RegExp(r'\r?\n'))
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
+    if (lines.length < 2) {
+      return {};
+    }
+    int headerIdx = -1;
+    List<String> txtHeader = [];
+    for (int i = 0; i < lines.length; ++i) {
+      final cols = lines[i]
+          .split(RegExp(r'\s+|,|;|\t'))
+          .map((e) => e.trim().toUpperCase())
+          .toList();
+      if (cols.contains('TIME') &&
+          (cols.contains('DEPTH') || cols.contains('DEPT'))) {
+        headerIdx = i;
+        txtHeader = lines[i]
+            .split(RegExp(r'\s+|,|;|\t'))
+            .map((e) => e.trim())
+            .toList();
+        break;
+      }
+    }
+    if (headerIdx == -1) {
+      return {};
+    }
+    final timeIdx = txtHeader.indexWhere((c) => c.toUpperCase() == 'TIME');
+    int depthIdx = txtHeader.indexWhere((c) => c.toUpperCase() == 'DEPTH');
+    if (depthIdx == -1) {
+      depthIdx = txtHeader.indexWhere((c) => c.toUpperCase() == 'DEPT');
+    }
+    final lspdIdx = txtHeader.indexWhere((c) => c.toUpperCase() == 'LSPD');
+    if (timeIdx == -1 || depthIdx == -1) {
+      return {};
+    }
+    final Map<String, Map<String, String>> timeToData = {};
+    for (var i = headerIdx + 1; i < lines.length; ++i) {
+      final row = lines[i].split(RegExp(r'\s+|,|;|\t'));
+      if (row.length > depthIdx && row.length > timeIdx) {
+        final timeSec = parseTimeToSeconds(row[timeIdx]);
+        final data = <String, String>{'DEPTH': row[depthIdx]};
+        if (lspdIdx != -1 && row.length > lspdIdx) {
+          data['LSPD'] = row[lspdIdx];
+        }
+        timeToData[timeSec.toString()] = data;
+      }
+    }
+    return timeToData;
+  }
+
   /// Hàm tách phần đọc dữ liệu TXT, trả về Map TIME → DEPTH
   Map<String, String>? parseTimeDepthMapFromTxt(String txtContent) {
     final lines = txtContent
@@ -211,8 +270,10 @@ class LisFileParser {
     final newTable = List<Map<String, dynamic>>.from(
       tableData.map((row) => Map<String, dynamic>.from(row)),
     );
-    Map<String, String> timeToDepth =
-        parseTimeDepthMapFromTxt(txtContent) ?? <String, String>{};
+    // Sử dụng hàm mới để lấy DEPTH và LSPD từ TXT
+    Map<String, Map<String, String>> timeToData = parseTimeLspdDepthMapFromTxt(
+      txtContent,
+    );
 
     for (int i = newTable.length - 1; i >= 0; --i) {
       final row = newTable[i];
@@ -238,10 +299,16 @@ class LisFileParser {
       }
 
       final timeVal = (timeNum / 1000).toString();
-      if (timeToDepth.containsKey(timeVal)) {
-        final newDepth = timeToDepth[timeVal];
-        if (newDepth != null && newDepth != row[targetCol]?.toString()) {
-          newTable[i][targetCol] = newDepth;
+      if (timeToData.containsKey(timeVal)) {
+        final data = timeToData[timeVal]!;
+        // Gán DEPTH
+        if (data.containsKey('DEPTH') &&
+            data['DEPTH'] != row[targetCol]?.toString()) {
+          newTable[i][targetCol] = data['DEPTH'];
+        }
+        // Nếu có LSPD trong TXT và có cột SPEE trong tableData thì gán vào SPEE
+        if (data.containsKey('LSPD') && row.containsKey('SPEE')) {
+          newTable[i]['SPEE'] = data['LSPD'];
         }
       } else {
         // Xóa row nếu TIME không khớp với TXT
@@ -310,7 +377,7 @@ class LisFileParser {
     }
     final isIncreasing = increaseCount >= decreaseCount;
     print(
-      '[DEBUG][normalizeTableData] Xu hướng chính: ${isIncreasing ? 'Tăng' : 'Giảm'} (increaseCount=$increaseCount, decreaseCount=$decreaseCount)',
+      '[DEBUG][normalizeTableData] Xu hướng chính: ${isIncreasing ? 'Tăng' : 'Giảm'} (increaseCount=$increaseCount, decreaseCount=$decreaseCount)',
     );
 
     // 2. Sắp xếp dữ liệu DEPT theo xu hướng chính (in-place)
@@ -354,7 +421,9 @@ class LisFileParser {
     double chosenStep = allowedSteps
         .reduce((a, b) => (mainStep - a).abs() < (mainStep - b).abs() ? a : b)
         .toDouble();
-    stepChuanHoa = chosenStep;
+    //stepChuanHoa = chosenStep;
+    stepChuanHoa = isIncreasing ? chosenStep : -chosenStep;
+
     // 5. Làm tròn Depth đầu tiên
     firstDepth = double.tryParse(data.first[deptCol]?.toString() ?? '') ?? 0.0;
     firstDepth = double.parse(firstDepth.toStringAsFixed(2));
@@ -677,9 +746,9 @@ class LisFileParser {
 
     final updatedEntryBlock = EntryBlock();
     if (stepChuanHoa < 0) {
-      updatedEntryBlock.nDirection = 255;
-    } else {
       updatedEntryBlock.nDirection = 1;
+    } else {
+      updatedEntryBlock.nDirection = 255;
     }
 
     updatedEntryBlock.fFrameSpacing = stepChuanHoa.abs() * 100;
@@ -943,6 +1012,8 @@ class LisFileParser {
     bytes.add(1);
     bytes.add(66);
     bytes.add(entryBlock.nDirection & 0xFF);
+    // Trường 4.5: Print direction for debugging
+    print('EntryBlock Direction: ${entryBlock.nDirection}');
 
     // Trường 5: nOpticalDepthUnit
     bytes.add(5);
@@ -3103,6 +3174,50 @@ class LisFileParser {
               for (int i = 0; i < 4 && i < deptBytes.length; i++) {
                 frameBytesCopy[i] = deptBytes[i];
               }
+
+              // Update SPEE value in the frame if present in row
+              final speeValue = row['SPEE'];
+              if (speeValue != null && speeValue != 'NULL') {
+                final speeDatum = datumBlocks.firstWhere(
+                  (d) => d.mnemonic == 'SPEE',
+                  orElse: () => DatumSpecBlock.empty('SPEE'),
+                );
+
+                // Only proceed if SPEE datum exists
+                if (speeDatum.mnemonic == 'SPEE') {
+                  double speeDouble = 0.0;
+                  if (speeValue is num) {
+                    speeDouble = speeValue.toDouble();
+                  } else if (speeValue is String) {
+                    speeDouble = double.tryParse(speeValue) ?? 0.0;
+                  }
+
+                  // Calculate offset for SPEE in the frame
+                  int speeOffset = 0;
+                  for (final d in datumBlocks) {
+                    if (d.mnemonic == 'SPEE') {
+                      break;
+                    }
+                    speeOffset += d.size;
+                  }
+
+                  final speeBytes = CodeReader.encode(speeDouble, 68, 4);
+
+                  print(
+                    '[DEBUG] SPEE value: speeDouble=$speeDouble, speeBytes=${speeBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
+                  );
+
+                  // Update SPEE bytes in the frame
+                  for (
+                    int i = 0;
+                    i < speeBytes.length &&
+                        speeOffset + i < frameBytesCopy.length;
+                    i++
+                  ) {
+                    frameBytesCopy[speeOffset + i] = speeBytes[i];
+                  }
+                }
+              }
             }
 
             outputBuffer.add(frameBytesCopy);
@@ -3117,6 +3232,9 @@ class LisFileParser {
       nextAdr =
           nextAdr + 16 + 6 + framePerRecordNew * entryBlock.nDataFrameSize;
     }
+
+    // Print stepChuanHoa for debugging
+    print('[DEBUG] stepChuanHoa: $stepChuanHoa');
 
     // Update EntryBlock
     final updatedEntryBlock = EntryBlock();

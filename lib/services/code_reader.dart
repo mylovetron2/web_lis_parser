@@ -45,15 +45,16 @@ class CodeReader {
     }
     //E++;
     // Lấy phần thập phân nhị phân
-    double fracBinNorm = norm - norm.floor();
+    // norm nằm trong [0.5, 1.0), cần encode phần thập phân (bỏ 0.5)
     int fracBits = 0;
-    double frac = fracBinNorm;
-    for (int i = 0; i < 23; i++) {
-      frac *= 2;
-      if (frac >= 1.0) {
-        fracBits |= (1 << (22 - i));
-        frac -= 1.0;
+    double remainingFrac = norm; // Bắt đầu từ giá trị đã normalize
+    double bitValue = 0.5; // Bit đầu tiên đại diện cho 0.5
+    for (int i = 22; i >= 0; i--) {
+      if (remainingFrac >= bitValue) {
+        fracBits |= (1 << i);
+        remainingFrac -= bitValue;
       }
+      bitValue /= 2.0;
     }
     if (value >= 0) {
       signBit = 0;
@@ -83,30 +84,57 @@ class CodeReader {
     int signBit = (b0 >> 7) & 0x1;
     int exponent = ((b0 & 0x7F) << 1) | ((b1 >> 7) & 0x1);
     int fraction = ((b1 & 0x7F) << 16) | (b2 << 8) | b3;
+
+    // Decode mantissa using factor array matching _read32BitFloat
+    List<double> factor = [
+      0,
+      0.5,
+      0.25,
+      0.125,
+      0.0625,
+      0.03125,
+      0.015625,
+      0.0078125,
+      0.00390625,
+      0.001953125,
+      0.0009765625,
+      0.00048828125,
+      0.000244140625,
+      0.0001220703125,
+      0.00006103515625,
+      0.000030517578125,
+      0.0000152587890625,
+      0.00000762939453125,
+      0.000003814697265625,
+      0.0000019073486328125,
+      0.00000095367431640625,
+      0.000000476837158203125,
+      0.0000002384185791015625,
+      0.00000011920928955078125,
+    ];
+
     if (signBit == 0) {
       // Số dương
-      double frac = 0.0;
-      for (int i = 0; i < 23; i++) {
-        if ((fraction & (1 << (22 - i))) != 0) {
-          frac += math.pow(2.0, -(i + 1));
-        }
+      int mPart = fraction;
+      double M = 0;
+      int mPart2 = mPart << 8;
+      for (int i = 0; i < 24; i++) {
+        if ((mPart2 & 0x80000000) == 0x80000000) M += factor[i];
+        mPart2 = mPart2 << 1;
       }
-      double M = frac;
-      int E = exponent - 128;
-      return M * math.pow(2.0, E);
+      int E = exponent;
+      return M * math.pow(2.0, E - 128);
     } else {
       // Số âm
-      int E = 127 - exponent;
-      // Mantissa là phần bù hai
-      int fracBits = (~fraction + 1) & 0x7FFFFF;
-      double frac = 0.0;
-      for (int i = 0; i < 23; i++) {
-        if ((fracBits & (1 << (22 - i))) != 0) {
-          frac += math.pow(2.0, -(i + 1));
-        }
+      int mPart = (~fraction + 1) & 0x7FFFFF;
+      double M = 0;
+      int mPart2 = mPart << 8;
+      for (int i = 0; i < 24; i++) {
+        if ((mPart2 & 0x80000000) == 0x80000000) M += factor[i];
+        mPart2 = mPart2 << 1;
       }
-      double M = frac - 1.0;
-      return M * math.pow(2.0, E);
+      int E = exponent;
+      return (M.abs() < 0.00000001) ? 0 : -M * math.pow(2.0, 127 - E);
     }
   }
 
@@ -526,15 +554,32 @@ class CodeReader {
 
     // Normalize fraction to [0.5, 1.0) range
     double targetFraction = absValue;
-    int exponentBits = isNegative ? 127 : 128;
+    int exponentBits;
 
-    while (targetFraction >= 1.0) {
-      targetFraction /= 2.0;
-      exponentBits++;
-    }
-    while (targetFraction < 0.5) {
-      targetFraction *= 2.0;
-      exponentBits--;
+    if (!isNegative) {
+      // Positive: value = M * 2^(E - 128)
+      exponentBits = 128;
+      while (targetFraction >= 1.0) {
+        targetFraction /= 2.0;
+        exponentBits++;
+      }
+      while (targetFraction < 0.5) {
+        targetFraction *= 2.0;
+        exponentBits--;
+      }
+    } else {
+      // Negative: value = -M * 2^(127 - E)
+      // So: 127 - E = log2(absValue/M)
+      // => E = 127 - log2(absValue/M)
+      exponentBits = 127;
+      while (targetFraction >= 1.0) {
+        targetFraction /= 2.0;
+        exponentBits--; // Decrease for negative!
+      }
+      while (targetFraction < 0.5) {
+        targetFraction *= 2.0;
+        exponentBits++; // Increase for negative!
+      }
     }
 
     // Clamp exponent to valid range
@@ -557,19 +602,15 @@ class CodeReader {
       mantissaBits = (~mantissaBits + 1) & 0x7FFFFF;
     }
 
-    // Assemble the 32-bit result
-    int result = 0;
-    if (isNegative) {
-      result |= 0x80000000; // Sign bit
-    }
-    result |= (exponentBits << 23); // Exponent (8 bits)
-    result |= mantissaBits; // Mantissa (23 bits)
-
-    // Extract bytes in big-endian order
-    int ch0 = (result >> 24) & 0xFF;
-    int ch1 = (result >> 16) & 0xFF;
-    int ch2 = (result >> 8) & 0xFF;
-    int ch3 = result & 0xFF;
+    // Assemble bytes according to Russian LIS format:
+    // Byte 0: [S][E7-E1]
+    // Byte 1: [E0][M22-M16]
+    // Byte 2: [M15-M8]
+    // Byte 3: [M7-M0]
+    int ch0 = (isNegative ? 0x80 : 0x00) | ((exponentBits >> 1) & 0x7F);
+    int ch1 = ((exponentBits & 0x01) << 7) | ((mantissaBits >> 16) & 0x7F);
+    int ch2 = (mantissaBits >> 8) & 0xFF;
+    int ch3 = mantissaBits & 0xFF;
 
     final encoded = Uint8List.fromList([ch0, ch1, ch2, ch3]);
     // print(

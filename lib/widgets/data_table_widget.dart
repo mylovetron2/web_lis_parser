@@ -152,8 +152,15 @@ class _DataTableWidgetState extends State<DataTableWidget> {
       int matchCount = merged.length; // Số dòng còn lại sau merge
 
       // Update the table data in memory (works on both web and desktop)
+      // Nếu sau merge có cột LSPD thì tự động thêm vào columnNames để hiển thị
+      final hasLspd = merged.any((row) => row.containsKey('LSPD'));
+      final newColumnNames = List<String>.from(columnNames);
+      if (hasLspd && !newColumnNames.contains('LSPD')) {
+        newColumnNames.add('LSPD');
+      }
       setState(() {
         tableData = merged;
+        columnNames = newColumnNames;
         currentPage = 0; // quay về trang đầu để dễ thấy thay đổi
         // Clear editing state after merge
         editingCellKey = null;
