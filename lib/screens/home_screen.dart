@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../services/lis_file_parser.dart';
 import 'lis_viewer_screen.dart';
+import 'txt_analysis_screen.dart';
 //import 'all_data_viewer_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -154,7 +155,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // ...existing code...
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TxtAnalysisScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.analytics),
+                  label: const Text('TXT Analysis'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    textStyle: const TextStyle(fontSize: 18),
+                    backgroundColor: Colors.teal,
+                  ),
+                ),
               ],
               if (_errorMessage != null) ...[
                 const SizedBox(height: 24),

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô tả hàm getTableData - LIS File Parser</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2980b9;
+            margin-top: 30px;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }
+        h3 {
+            color: #34495e;
+            margin-top: 20px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e74c3c;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border-left: 4px solid #3498db;
+        }
+        pre code {
+            background: transparent;
+            color: #ecf0f1;
+            padding: 0;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .flowchart {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .step {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #3498db;
+            border-radius: 3px;
+        }
+        .step-number {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .note::before {
+            content: "⚠️ Lưu ý: ";
+            font-weight: bold;
+            color: #856404;
+        }
+        .example {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .example::before {
+            content: "💡 Ví dụ: ";
+            font-weight: bold;
+            color: #0c5460;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .formula {
+            background: #e8f4f8;
+            padding: 15px;
+            border-left: 4px solid #2980b9;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Mô tả hàm getTableData</h1>
+        <p><strong>File:</strong> <code>lib/services/lis_file_parser.dart</code></p>
+        <p><strong>Mục đích:</strong> Đọc và chuyển đổi dữ liệu từ Data Records trong file LIS thành dạng bảng để hiển thị trên UI</p>
+
+        <div class="section">
+            <h2>1. Chữ ký hàm (Function Signature)</h2>
+            <pre><code>Future&lt;List&lt;Map&lt;String, dynamic&gt;&gt;&gt; getTableData({int maxRows = 1000}) async</code></pre>
+            
+            <h3>Tham số:</h3>
+            <table>
+                <tr>
+                    <th>Tên</th>
+                    <th>Kiểu</th>
+                    <th>Mặc định</th>
+                    <th>Mô tả</th>
+                </tr>
+                <tr>
+                    <td><code>maxRows</code></td>
+                    <td>int</td>
+                    <td>1000</td>
+                    <td>Số dòng tối đa cần đọc để tránh load quá nhiều dữ liệu</td>
+                </tr>
+            </table>
+
+            <h3>Giá trị trả về:</h3>
+            <p><code>List&lt;Map&lt;String, dynamic&gt;&gt;</code> - Danh sách các dòng dữ liệu</p>
+            <ul>
+                <li><strong>Key:</strong> Tên cột (mnemonic) như "DEPTH", "GR", "CALI"...</li>
+                <li><strong>Value:</strong> Giá trị dữ liệu (String cho single values, Map cho arrays)</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>2. Quy trình xử lý (Processing Flow)</h2>
+            
+            <div class="flowchart">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Kiểm tra điều kiện</strong>
+                    <ul>
+                        <li>File đã mở chưa? (<code>isFileOpen</code>)</li>
+                        <li>Có Data Records không? (<code>startDataRec</code>, <code>endDataRec</code>)</li>
+                        <li>Có Datum Blocks không? (<code>datumBlocks.isEmpty</code>)</li>
+                    </ul>
+                    <div class="note">Nếu không đủ điều kiện → Tạo dữ liệu mẫu (sample data) để test</div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Duyệt qua các Data Records</strong>
+                    <pre><code>for (recordIdx = startDataRec; recordIdx <= endDataRec; recordIdx++)</code></pre>
+                    <ul>
+                        <li>Bắt đầu từ record đầu tiên có data</li>
+                        <li>Kết thúc ở record cuối cùng</li>
+                        <li>Dừng sớm nếu đủ <code>maxRows</code></li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Lấy dữ liệu frame</strong>
+                    <ul>
+                        <li><code>frameData = await getAllData(recordIdx)</code> - Lấy toàn bộ data của record</li>
+                        <li><code>frameNum = getFrameNum(recordIdx)</code> - Số frame trong record</li>
+                        <li><code>startingDepth = currentDepth</code> - Độ sâu khởi đầu</li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Xử lý từng frame</strong>
+                    <p>Với mỗi frame trong record:</p>
+                    <ul>
+                        <li>Tính độ sâu của frame</li>
+                        <li>Trích xuất giá trị các curve</li>
+                        <li>Tạo một dòng dữ liệu (row)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Tính toán độ sâu (Depth Calculation)</h2>
+            
+            <div class="formula">
+<strong>Công thức tính depth cho mỗi frame:</strong>
+
+double frameDepth = startingDepth;
+
+if (entryBlock.nDirection == LisConstants.dirDown) {
+    // Khoan xuống: depth tăng
+    frameDepth += frame * (step / 1000.0);
+} else {
+    // Khoan lên: depth giảm
+    frameDepth -= frame * (step / 1000.0);
+}
+
+row['DEPTH'] = frameDepth.toStringAsFixed(3);
+            </div>
+
+            <p><strong>Giải thích:</strong></p>
+            <ul>
+                <li><code>startingDepth</code>: Độ sâu tại frame đầu tiên của record</li>
+                <li><code>frame</code>: Index của frame (0, 1, 2...)</li>
+                <li><code>step</code>: Khoảng cách giữa các frame (từ entryBlock)</li>
+                <li><code>step / 1000.0</code>: Chuyển đổi từ mm sang m (nếu cần)</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>4. Xác định cấu trúc dữ liệu frame</h2>
+            
+            <p>Mỗi frame chứa dữ liệu của tất cả curves. Cần tính toán vị trí chính xác của từng giá trị:</p>
+
+            <div class="formula">
+<strong>Bước 1: Đếm số values trong 1 frame</strong>
+
+int singleValuesPerFrame = 0;    // Số curve đơn
+int arrayElementsPerFrame = 0;   // Tổng số phần tử array
+
+for (var datum in datumBlocks) {
+    // Skip DEPT trong depth-per-frame mode
+    if (entryBlock.nDepthRecordingMode == 0 && datum.mnemonic == 'DEPT') {
+        continue;
+    }
+    
+    if (datum.size <= 4) {
+        singleValuesPerFrame += 1;        // Single value
+    } else {
+        arrayElementsPerFrame += datum.dataItemNum;  // Array elements
+    }
+}
+
+int totalValuesPerFrame = singleValuesPerFrame + arrayElementsPerFrame;
+            </div>
+
+            <div class="formula">
+<strong>Bước 2: Tính vị trí bắt đầu của frame</strong>
+
+int frameDataStartIndex = frame * totalValuesPerFrame;
+int currentIndex = frameDataStartIndex;
+            </div>
+
+            <div class="example">
+Ví dụ: Nếu mỗi frame có 5 single curves + 1 array curve (100 elements):
+<ul>
+    <li>totalValuesPerFrame = 5 + 100 = 105</li>
+    <li>Frame 0 bắt đầu tại index: 0</li>
+    <li>Frame 1 bắt đầu tại index: 105</li>
+    <li>Frame 2 bắt đầu tại index: 210</li>
+</ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>5. Map dữ liệu vào các cột</h2>
+            
+            <h3>5.1. Single Value Curves (size ≤ 4 bytes)</h3>
+            <pre><code>if (datum.size <= 4) {
+    if (currentIndex < frameData.length) {
+        final value = frameData[currentIndex];
+        row[columnName] = value.isNaN ? 'NULL' : value.toStringAsFixed(3);
+        currentIndex += 1;
+    } else {
+        row[columnName] = 'NULL';
+    }
+}</code></pre>
+
+            <p><strong>Xử lý:</strong></p>
+            <ul>
+                <li>Lấy giá trị tại <code>currentIndex</code></li>
+                <li>Kiểm tra NaN → Hiển thị "NULL"</li>
+                <li>Format số với 3 chữ số thập phân: <code>.toStringAsFixed(3)</code></li>
+                <li>Tăng index lên 1</li>
+            </ul>
+
+            <h3>5.2. Array Curves (size > 4 bytes)</h3>
+            <pre><code>else {
+    // Array datum - hiển thị "..." và lưu metadata
+    row[columnName] = {
+        'display': '...',
+        'isArray': true,
+        'recordIdx': recordIdx,
+        'frameIdx': frame,
+        'datumName': columnName,
+    };
+    currentIndex += datum.dataItemNum;  // Skip array elements
+}</code></pre>
+
+            <p><strong>Xử lý:</strong></p>
+            <ul>
+                <li>Không hiển thị giá trị chi tiết (quá nhiều data)</li>
+                <li>Hiển thị "..." trên UI</li>
+                <li>Lưu metadata để xem waveform khi user click</li>
+                <li>Skip qua tất cả elements của array</li>
+            </ul>
+
+            <div class="note">
+                Array curves thường là waveform data (hàng trăm/nghìn điểm), không phù hợp hiển thị trong table cell
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>6. Thêm cột Adr (Address)</h2>
+            
+            <pre><code>row['Adr'] = '$recordIdx:$frame';</code></pre>
+
+            <p><strong>Mục đích:</strong></p>
+            <ul>
+                <li>Lưu vị trí chính xác của frame trong file LIS</li>
+                <li>Format: <code>recordIndex:frameIndex</code></li>
+                <li>Dùng để reference khi cần update/export dữ liệu</li>
+            </ul>
+
+            <div class="example">
+Ví dụ:
+<ul>
+    <li><code>"10:0"</code> - Frame đầu tiên của record thứ 10</li>
+    <li><code>"10:5"</code> - Frame thứ 6 của record thứ 10</li>
+    <li><code>"25:12"</code> - Frame thứ 13 của record thứ 25</li>
+</ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>7. Output Example</h2>
+            
+            <pre><code>[
+  {
+    'DEPTH': '1525.125',
+    'GR': '45.230',
+    'CALI': '8.750',
+    'SP': '-12.500',
+    'RHOB': '2.350',
+    'NPHI': '0.245',
+    'Adr': '10:0'
+  },
+  {
+    'DEPTH': '1525.250',
+    'GR': '46.120',
+    'CALI': '8.755',
+    'SP': '-12.480',
+    'RHOB': '2.348',
+    'NPHI': '0.247',
+    'Adr': '10:1'
+  },
+  {
+    'DEPTH': '1525.375',
+    'GR': '47.050',
+    'CALI': '8.760',
+    'SP': '-12.465',
+    'RHOB': '2.345',
+    'NPHI': '0.250',
+    'Adr': '10:2'
+  }
+]</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>8. Đặc điểm quan trọng</h2>
+            
+            <h3>8.1. Skip DEPT trong depth-per-frame mode</h3>
+            <pre><code>if (entryBlock.nDepthRecordingMode == 0 && datum.mnemonic == 'DEPT') {
+    continue;  // Skip DEPT column
+}</code></pre>
+            <ul>
+                <li><strong>Lý do:</strong> Trong mode này, depth được tính tự động cho mỗi frame</li>
+                <li>Không cần đọc giá trị DEPT từ data</li>
+                <li>Tránh duplicate cột DEPTH</li>
+            </ul>
+
+            <h3>8.2. Định dạng số (Number Formatting)</h3>
+            <ul>
+                <li>Tất cả số được format với 3 chữ số thập phân: <code>.toStringAsFixed(3)</code></li>
+                <li>NaN values → Hiển thị "NULL"</li>
+                <li>Giữ dữ liệu dạng String để dễ hiển thị trên UI</li>
+            </ul>
+
+            <h3>8.3. Error Handling</h3>
+            <ul>
+                <li>Nếu <code>currentIndex >= frameData.length</code> → Return "NULL"</li>
+                <li>Nếu không đọc được data → Row bị skip</li>
+                <li>Try-catch bao quanh toàn bộ process</li>
+            </ul>
+
+            <h3>8.4. Performance Optimization</h3>
+            <ul>
+                <li>Giới hạn số rows (<code>maxRows</code>) để tránh lag UI</li>
+                <li>Không load toàn bộ file vào memory</li>
+                <li>Chỉ parse dữ liệu cần thiết</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>9. Sử dụng trong hệ thống</h2>
+            
+            <h3>9.1. Từ DataTableWidget</h3>
+            <pre><code>final tableData = await parser.getTableData(maxRows: 1000);
+setState(() {
+    this.tableData = tableData;
+    columnNames = parser.getColumnNames();
+});</code></pre>
+
+            <h3>9.2. Từ Export/Merge functions</h3>
+            <pre><code>// Lấy toàn bộ data để export
+final allData = await parser.getTableData(maxRows: 999999);
+
+// Merge với TXT data
+final merged = parser.mergeDepthToTable(
+    txtContent: txtContent,
+    tableData: allData,
+    columnNames: columnNames,
+);</code></pre>
+
+            <h3>9.3. Từ Chart Screen</h3>
+            <pre><code>// Lấy data mẫu để vẽ chart
+final chartData = await parser.getTableData(maxRows: 500);</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>10. Luồng dữ liệu tổng quan</h2>
+            
+            <div class="flowchart">
+                <pre style="background: #34495e; color: #ecf0f1;">
+┌─────────────────────────────────────────────────────────────┐
+│                    getTableData()                           │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────┐
+            │ Kiểm tra file đã mở chưa?     │
+            └───────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────┐
+            │ Duyệt qua Data Records        │
+            │ (startDataRec → endDataRec)   │
+            └───────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────┐
+            │ Với mỗi record:               │
+            │ - getAllData(recordIdx)       │
+            │ - getFrameNum(recordIdx)      │
+            └───────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────┐
+            │ Với mỗi frame trong record:   │
+            │ - Tính depth                  │
+            │ - Map curve values            │
+            │ - Tạo row data                │
+            └───────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────┐
+            │ Single value curves:          │
+            │ → Format .toStringAsFixed(3)  │
+            └───────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────┐
+            │ Array curves:                 │
+            │ → Lưu metadata, hiển thị "..." │
+            └───────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────┐
+            │ Thêm cột Adr: "recordIdx:frame"│
+            └───────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────┐
+            │ Return List<Map<String, dynamic>>│
+            └───────────────────────────────┘
+                </pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>11. Tham khảo code liên quan</h2>
+            
+            <table>
+                <tr>
+                    <th>Hàm</th>
+                    <th>File</th>
+                    <th>Mục đích</th>
+                </tr>
+                <tr>
+                    <td><code>getAllData()</code></td>
+                    <td>lis_file_parser.dart</td>
+                    <td>Đọc toàn bộ data của 1 record</td>
+                </tr>
+                <tr>
+                    <td><code>getFrameNum()</code></td>
+                    <td>lis_file_parser.dart</td>
+                    <td>Lấy số frame trong record</td>
+                </tr>
+                <tr>
+                    <td><code>getColumnNames()</code></td>
+                    <td>lis_file_parser.dart</td>
+                    <td>Lấy danh sách tên cột</td>
+                </tr>
+                <tr>
+                    <td><code>mergeDepthToTable()</code></td>
+                    <td>lis_file_parser.dart</td>
+                    <td>Merge data từ TXT vào table</td>
+                </tr>
+                <tr>
+                    <td><code>DataTableWidget</code></td>
+                    <td>data_table_widget.dart</td>
+                    <td>UI hiển thị table data</td>
+                </tr>
+            </table>
+        </div>
+
+        <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid #3498db; text-align: center; color: #7f8c8d;">
+            <p>📄 Document created: November 12, 2025</p>
+            <p>🔧 Flutter LIS Parser Web - getTableData Function Documentation</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -275,9 +275,16 @@ class LisFileParser {
       txtContent,
     );
 
+    // Print first 2 lines of txtContent for debugging
+    final txtLines = txtContent.split(RegExp(r'\r?\n'));
+    if (txtLines.length >= 2) {
+      print('[DEBUG] txtContent line 1: ${txtLines[0]}');
+      print('[DEBUG] txtContent line 2: ${txtLines[1]}');
+    }
+
     for (int i = newTable.length - 1; i >= 0; --i) {
       final row = newTable[i];
-      final rawTime = row['TIME'];
+      final rawTime = row['DEPTH'];
 
       // Xóa row nếu TIME NULL hoặc không hợp lệ
       if (rawTime == null || rawTime == 'NULL') {

@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô tả hàm mergeDepthToTable - LIS File Parser</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #c0392b;
+            margin-top: 30px;
+            border-left: 4px solid #e74c3c;
+            padding-left: 15px;
+        }
+        h3 {
+            color: #34495e;
+            margin-top: 20px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e74c3c;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border-left: 4px solid #e74c3c;
+        }
+        pre code {
+            background: transparent;
+            color: #ecf0f1;
+            padding: 0;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .flowchart {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .step {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #e74c3c;
+            border-radius: 3px;
+        }
+        .step-number {
+            display: inline-block;
+            background: #e74c3c;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .note::before {
+            content: "⚠️ Lưu ý: ";
+            font-weight: bold;
+            color: #856404;
+        }
+        .warning {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .warning::before {
+            content: "❌ Quan trọng: ";
+            font-weight: bold;
+            color: #721c24;
+        }
+        .example {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .example::before {
+            content: "💡 Ví dụ: ";
+            font-weight: bold;
+            color: #0c5460;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #e74c3c;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .formula {
+            background: #ffe6e6;
+            padding: 15px;
+            border-left: 4px solid #c0392b;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .success::before {
+            content: "✅ Kết quả: ";
+            font-weight: bold;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Mô tả hàm mergeDepthToTable</h1>
+        <p><strong>File:</strong> <code>lib/services/lis_file_parser.dart</code></p>
+        <p><strong>Mục đích:</strong> Merge dữ liệu DEPTH từ file TXT vào table data của LIS, đồng thời xử lý cột LSPD (nếu có)</p>
+
+        <div class="section">
+            <h2>1. Chữ ký hàm (Function Signature)</h2>
+            <pre><code>List&lt;Map&lt;String, dynamic&gt;&gt; mergeDepthToTable({
+  required List&lt;Map&lt;String, dynamic&gt;&gt; tableData,
+  required String txtContent,
+  required List&lt;String&gt; columnNames,
+})</code></pre>
+            
+            <h3>Tham số:</h3>
+            <table>
+                <tr>
+                    <th>Tên</th>
+                    <th>Kiểu</th>
+                    <th>Mô tả</th>
+                </tr>
+                <tr>
+                    <td><code>tableData</code></td>
+                    <td>List&lt;Map&lt;String, dynamic&gt;&gt;</td>
+                    <td>Dữ liệu bảng từ LIS file (output của getTableData)</td>
+                </tr>
+                <tr>
+                    <td><code>txtContent</code></td>
+                    <td>String</td>
+                    <td>Nội dung file TXT chứa TIME, DEPTH, LSPD</td>
+                </tr>
+                <tr>
+                    <td><code>columnNames</code></td>
+                    <td>List&lt;String&gt;</td>
+                    <td>Danh sách tên cột của table</td>
+                </tr>
+            </table>
+
+            <h3>Giá trị trả về:</h3>
+            <p><code>List&lt;Map&lt;String, dynamic&gt;&gt;</code> - Dữ liệu bảng đã được merge và chuẩn hóa</p>
+        </div>
+
+        <div class="section">
+            <h2>2. Mục đích chính</h2>
+            
+            <ol>
+                <li><strong>Merge DEPTH từ TXT:</strong> Thay thế giá trị DEPTH trong LIS bằng DEPTH từ TXT (chính xác hơn)</li>
+                <li><strong>Merge LSPD → SPEE:</strong> Nếu TXT có cột LSPD, gán vào cột SPEE của LIS</li>
+                <li><strong>Lọc dữ liệu:</strong> Xóa các row không khớp TIME hoặc có TIME NULL</li>
+                <li><strong>Chuẩn hóa:</strong> Sắp xếp và điều chỉnh DEPTH theo step đều đặn</li>
+            </ol>
+
+            <div class="warning">
+                Hàm này sẽ XÓA các row không có TIME khớp với TXT. Số lượng row sau merge thường ít hơn ban đầu.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Quy trình xử lý chi tiết</h2>
+            
+            <div class="flowchart">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Xác định cột DEPTH target</strong>
+                    <pre><code>final targetCol = _resolveDepthColumn(columnNames);</code></pre>
+                    <ul>
+                        <li>Tìm cột DEPTH hoặc DEPT trong columnNames</li>
+                        <li>Đây là cột sẽ bị thay thế giá trị</li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Tạo bản sao dữ liệu</strong>
+                    <pre><code>final newTable = List&lt;Map&lt;String, dynamic&gt;&gt;.from(
+  tableData.map((row) => Map&lt;String, dynamic&gt;.from(row)),
+);</code></pre>
+                    <p><strong>Lý do:</strong> Không muốn ảnh hưởng dữ liệu gốc trong memory</p>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Parse TXT file</strong>
+                    <pre><code>Map&lt;String, Map&lt;String, String&gt;&gt; timeToData = 
+    parseTimeLspdDepthMapFromTxt(txtContent);</code></pre>
+                    <p>Kết quả: Map có cấu trúc:</p>
+                    <pre><code>{
+  "12.5": {"DEPTH": "1525.125", "LSPD": "45.2"},
+  "13.0": {"DEPTH": "1525.250", "LSPD": "46.1"},
+  ...
+}</code></pre>
+                    <ul>
+                        <li>Key: TIME (giây) dạng String</li>
+                        <li>Value: Map chứa DEPTH và LSPD (nếu có)</li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Duyệt ngược và merge/filter</strong>
+                    <pre><code>for (int i = newTable.length - 1; i >= 0; --i) {
+  // Xử lý từng row
+}</code></pre>
+                    <div class="note">Duyệt ngược (từ cuối lên đầu) để có thể xóa row an toàn bằng removeAt(i)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>4. Logic xử lý từng row</h2>
+            
+            <h3>4.1. Lấy giá trị TIME từ cột DEPTH</h3>
+            <pre><code>final rawTime = row['DEPTH'];  // Lưu ý: Dùng cột DEPTH làm TIME!</code></pre>
+
+            <div class="warning">
+                Đây là thiết kế đặc biệt: Cột "DEPTH" trong tableData LIS thực ra chứa giá trị TIME (milliseconds).
+                Cột này sẽ được THAY THẾ bằng DEPTH thật từ TXT.
+            </div>
+
+            <h3>4.2. Kiểm tra và xóa row nếu TIME NULL</h3>
+            <pre><code>if (rawTime == null || rawTime == 'NULL') {
+  newTable.removeAt(i);
+  continue;
+}</code></pre>
+
+            <h3>4.3. Parse TIME thành số</h3>
+            <pre><code>double? timeNum;
+if (rawTime is num) {
+  timeNum = rawTime.toDouble();
+} else {
+  timeNum = double.tryParse(rawTime.toString());
+}
+
+if (timeNum == null) {
+  newTable.removeAt(i);  // Xóa nếu không parse được
+  continue;
+}</code></pre>
+
+            <h3>4.4. Chuyển TIME từ milliseconds sang seconds</h3>
+            <pre><code>final timeVal = (timeNum / 1000).toString();</code></pre>
+            <div class="example">
+Ví dụ: TIME trong LIS là 12500ms → Chuyển thành "12.5" để khớp với TXT
+            </div>
+
+            <h3>4.5. Merge DEPTH và LSPD</h3>
+            <pre><code>if (timeToData.containsKey(timeVal)) {
+  final data = timeToData[timeVal]!;
+  
+  // Merge DEPTH
+  if (data.containsKey('DEPTH') && 
+      data['DEPTH'] != row[targetCol]?.toString()) {
+    newTable[i][targetCol] = data['DEPTH'];
+  }
+  
+  // Merge LSPD → SPEE
+  if (data.containsKey('LSPD') && row.containsKey('SPEE')) {
+    newTable[i]['SPEE'] = data['LSPD'];
+  }
+} else {
+  // Xóa row nếu TIME không khớp
+  newTable.removeAt(i);
+}</code></pre>
+
+            <div class="note">
+                Chỉ merge LSPD nếu:
+                <ul>
+                    <li>TXT có cột LSPD</li>
+                    <li>LIS table có cột SPEE</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>5. Debug logging</h2>
+            <pre><code>if (newTable.isNotEmpty) {
+  print('[DEBUG] After merge: ${newTable.length} rows remaining');
+  print('[DEBUG] First row after merge: ${newTable.first}');
+  
+  // Count TIME NULL
+  int nullCount = 0;
+  for (var row in newTable) {
+    if (row['TIME'] == null || row['TIME'] == 'NULL') {
+      nullCount++;
+    }
+  }
+  print('[DEBUG] Rows with TIME NULL: $nullCount/${newTable.length}');
+}</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>6. Chuẩn hóa dữ liệu (normalizeTableData)</h2>
+            
+            <pre><code>normalizeTableData(newTable, columnNames);</code></pre>
+
+            <p>Hàm <code>normalizeTableData</code> thực hiện:</p>
+
+            <div class="flowchart">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Xóa tất cả row có TIME NULL</strong>
+                    <pre><code>data.removeWhere((row) {
+  final timeValue = row['TIME'];
+  return timeValue == null || 
+         timeValue == 'NULL' || 
+         timeValue.toString().trim().isEmpty;
+});</code></pre>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Xác định xu hướng DEPTH (tăng/giảm)</strong>
+                    <ul>
+                        <li>Đếm số lần DEPTH tăng vs giảm giữa các row liên tiếp</li>
+                        <li>Xu hướng chính = xu hướng có count cao hơn</li>
+                    </ul>
+                    <pre><code>for (int i = 1; i < deptValues.length; i++) {
+  if (deptValues[i] > deptValues[i - 1]) increaseCount++;
+  if (deptValues[i] < deptValues[i - 1]) decreaseCount++;
+}
+final isIncreasing = increaseCount >= decreaseCount;</code></pre>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Sắp xếp DEPTH theo xu hướng</strong>
+                    <pre><code>data.sort((a, b) {
+  final da = double.tryParse(a[deptCol]?.toString() ?? '') ?? 0.0;
+  final db = double.tryParse(b[deptCol]?.toString() ?? '') ?? 0.0;
+  return isIncreasing ? da.compareTo(db) : db.compareTo(da);
+});</code></pre>
+                    <ul>
+                        <li>Nếu xu hướng TĂNG: Sort tăng dần</li>
+                        <li>Nếu xu hướng GIẢM: Sort giảm dần</li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Tìm step chính giữa các DEPTH</strong>
+                    <pre><code>for (int i = 1; i < data.length; i++) {
+  final prev = double.tryParse(data[i - 1][deptCol]?.toString() ?? '') ?? 0.0;
+  final curr = double.tryParse(data[i][deptCol]?.toString() ?? '') ?? 0.0;
+  steps.add((curr - prev).abs());
+}
+
+// Tìm step xuất hiện nhiều nhất
+final stepCounts = &lt;double, int&gt;{};
+for (final s in steps) {
+  final rounded = double.parse(s.toStringAsFixed(2));
+  stepCounts[rounded] = (stepCounts[rounded] ?? 0) + 1;
+}
+mainStep = stepCounts.entries
+    .reduce((a, b) => a.value > b.value ? a : b)
+    .key;</code></pre>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">5</span>
+                    <strong>Ép về step chuẩn</strong>
+                    <pre><code>final allowedSteps = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100];
+double chosenStep = allowedSteps
+    .reduce((a, b) => (mainStep - a).abs() < (mainStep - b).abs() ? a : b)
+    .toDouble();</code></pre>
+                    <p>Chọn step gần nhất trong danh sách step cho phép</p>
+                    <div class="example">
+Ví dụ: mainStep = 0.12 → chosenStep = 0.1<br>
+mainStep = 0.48 → chosenStep = 0.5<br>
+mainStep = 15 → chosenStep = 10
+                    </div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">6</span>
+                    <strong>Làm tròn DEPTH đầu tiên</strong>
+                    <pre><code>firstDepth = double.tryParse(data.first[deptCol]?.toString() ?? '') ?? 0.0;
+firstDepth = double.parse(firstDepth.toStringAsFixed(2));</code></pre>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">7</span>
+                    <strong>Hồi quy tuyến tính - Tái tính toàn bộ DEPTH</strong>
+                    <pre><code>for (int i = 0; i < data.length; i++) {
+  final newDepth = isIncreasing
+      ? firstDepth + i * chosenStep
+      : firstDepth - i * chosenStep;
+  data[i][deptCol] = newDepth.toStringAsFixed(3);
+}</code></pre>
+
+                    <div class="formula">
+<strong>Công thức:</strong>
+
+Nếu xu hướng TĂNG:
+  DEPTH[i] = firstDepth + i × chosenStep
+
+Nếu xu hướng GIẢM:
+  DEPTH[i] = firstDepth - i × chosenStep
+                    </div>
+
+                    <div class="warning">
+                        Tất cả DEPTH ban đầu bị GHI ĐÈ bởi giá trị mới tính theo công thức tuyến tính!
+                        Điều này đảm bảo DEPTH đều đặn với step cố định.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>7. Ví dụ minh họa</h2>
+            
+            <h3>Input:</h3>
+            <p><strong>tableData từ LIS:</strong></p>
+            <pre><code>[
+  {'DEPTH': '12500', 'GR': '45.2', 'SPEE': '10.5'},  // DEPTH = TIME ms
+  {'DEPTH': '13000', 'GR': '46.1', 'SPEE': '11.2'},
+  {'DEPTH': '13500', 'GR': '47.0', 'SPEE': '12.0'},
+  {'DEPTH': '14000', 'GR': '48.5', 'SPEE': '13.1'},
+]</code></pre>
+
+            <p><strong>txtContent:</strong></p>
+            <pre><code>TIME    DEPTH   LSPD
+12.5    1525.125    55.3
+13.0    1525.250    56.1
+13.5    1525.375    57.0
+14.0    1525.500    58.2</code></pre>
+
+            <h3>Processing:</h3>
+            <ol>
+                <li>Parse TXT → timeToData map</li>
+                <li>Row 0: TIME = 12500ms / 1000 = "12.5" → Khớp → Merge DEPTH = 1525.125, LSPD → SPEE = 55.3</li>
+                <li>Row 1: TIME = 13000ms / 1000 = "13.0" → Khớp → Merge DEPTH = 1525.250, LSPD → SPEE = 56.1</li>
+                <li>Row 2: TIME = 13500ms / 1000 = "13.5" → Khớp → Merge DEPTH = 1525.375, LSPD → SPEE = 57.0</li>
+                <li>Row 3: TIME = 14000ms / 1000 = "14.0" → Khớp → Merge DEPTH = 1525.500, LSPD → SPEE = 58.2</li>
+            </ol>
+
+            <h3>After merge (trước normalize):</h3>
+            <pre><code>[
+  {'DEPTH': '1525.125', 'GR': '45.2', 'SPEE': '55.3'},
+  {'DEPTH': '1525.250', 'GR': '46.1', 'SPEE': '56.1'},
+  {'DEPTH': '1525.375', 'GR': '47.0', 'SPEE': '57.0'},
+  {'DEPTH': '1525.500', 'GR': '48.5', 'SPEE': '58.2'},
+]</code></pre>
+
+            <h3>After normalize:</h3>
+            <p>Giả sử step = 0.125m, firstDepth = 1525.125:</p>
+            <pre><code>[
+  {'DEPTH': '1525.125', 'GR': '45.2', 'SPEE': '55.3'},  // 1525.125 + 0*0.125
+  {'DEPTH': '1525.250', 'GR': '46.1', 'SPEE': '56.1'},  // 1525.125 + 1*0.125
+  {'DEPTH': '1525.375', 'GR': '47.0', 'SPEE': '57.0'},  // 1525.125 + 2*0.125
+  {'DEPTH': '1525.500', 'GR': '48.5', 'SPEE': '58.2'},  // 1525.125 + 3*0.125
+]</code></pre>
+
+            <div class="success">
+                Dữ liệu đã được merge DEPTH từ TXT, merge LSPD vào SPEE, và chuẩn hóa với step đều đặn!
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>8. Trường hợp đặc biệt</h2>
+            
+            <h3>8.1. Row không khớp TIME</h3>
+            <pre><code>// Nếu TIME trong LIS không có trong TXT → XÓA row
+if (!timeToData.containsKey(timeVal)) {
+  newTable.removeAt(i);
+}</code></pre>
+            <div class="warning">
+                Điều này có thể làm giảm đáng kể số lượng row nếu TXT có ít data hơn LIS
+            </div>
+
+            <h3>8.2. Row có TIME NULL</h3>
+            <p>Bị xóa ở 2 chỗ:</p>
+            <ul>
+                <li>Trong <code>mergeDepthToTable</code>: Xóa ngay khi phát hiện</li>
+                <li>Trong <code>normalizeTableData</code>: Xóa lần nữa để chắc chắn</li>
+            </ul>
+
+            <h3>8.3. TXT không có cột LSPD</h3>
+            <pre><code>if (data.containsKey('LSPD') && row.containsKey('SPEE')) {
+  // Chỉ merge nếu cả 2 điều kiện đều đúng
+}</code></pre>
+            <p>Nếu không có LSPD → Chỉ merge DEPTH, không merge SPEE</p>
+
+            <h3>8.4. LIS không có cột SPEE</h3>
+            <p>Tương tự, không merge LSPD nếu không có cột SPEE đích</p>
+        </div>
+
+        <div class="section">
+            <h2>9. Luồng dữ liệu tổng quan</h2>
+            
+            <div class="flowchart">
+                <pre style="background: #34495e; color: #ecf0f1;">
+┌─────────────────────────────────────────────────────────────┐
+│               mergeDepthToTable()                           │
+└─────────────────────────────────────────────────────────────┘
+                            │
+        ┌───────────────────┴────────────────────┐
+        ▼                                        ▼
+┌──────────────────┐                  ┌─────────────────────┐
+│  tableData (LIS) │                  │  txtContent (TXT)   │
+│  DEPTH = TIME ms │                  │  TIME | DEPTH | LSPD│
+└──────────────────┘                  └─────────────────────┘
+        │                                        │
+        │                                        ▼
+        │                        ┌──────────────────────────────┐
+        │                        │ parseTimeLspdDepthMapFromTxt │
+        │                        └──────────────────────────────┘
+        │                                        │
+        │                                        ▼
+        │                        ┌──────────────────────────────┐
+        │                        │ Map<String, Map<String,String>>│
+        │                        │ timeToData                    │
+        │                        └──────────────────────────────┘
+        │                                        │
+        └───────────────────┬────────────────────┘
+                            ▼
+            ┌───────────────────────────────────┐
+            │ Duyệt ngược tableData (i--)       │
+            │ Với mỗi row:                      │
+            │   1. Lấy TIME từ cột DEPTH        │
+            │   2. TIME null? → Xóa row         │
+            │   3. TIME / 1000 = timeVal        │
+            │   4. timeVal in timeToData?       │
+            │      YES: Merge DEPTH & LSPD      │
+            │      NO:  Xóa row                 │
+            └───────────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────────┐
+            │      normalizeTableData()         │
+            │   1. Xóa TIME NULL                │
+            │   2. Xác định xu hướng            │
+            │   3. Sort theo xu hướng           │
+            │   4. Tìm step chính               │
+            │   5. Ép về step chuẩn             │
+            │   6. Hồi quy tuyến tính DEPTH     │
+            └───────────────────────────────────┘
+                            │
+                            ▼
+            ┌───────────────────────────────────┐
+            │    Return merged & normalized     │
+            │    List<Map<String, dynamic>>     │
+            └───────────────────────────────────┘
+                </pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>10. Sử dụng trong hệ thống</h2>
+            
+            <h3>10.1. Từ DataTableWidget</h3>
+            <pre><code>Future<void> _mergeByTimeFromTxt() async {
+  // Pick TXT file
+  FilePickerResult? result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ['txt'],
+  );
+  
+  String txtContent = utf8.decode(result.files.single.bytes!);
+  
+  // Merge
+  final merged = widget.parser.mergeDepthToTable(
+    txtContent: txtContent,
+    tableData: tableData,
+    columnNames: columnNames,
+  );
+  
+  int matchCount = merged.length;
+  
+  // Update UI
+  setState(() {
+    tableData = merged;
+  });
+}</code></pre>
+
+            <h3>10.2. Từ Export function</h3>
+            <pre><code>// Merge trước khi export
+final mergedData = parser.mergeDepthToTable(
+  txtContent: txtContent,
+  tableData: await parser.getTableData(),
+  columnNames: parser.getColumnNames(),
+);
+
+// Export merged data to new LIS file
+await parser.getModifiedFileBytes(mergedData);</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>11. Tham khảo code liên quan</h2>
+            
+            <table>
+                <tr>
+                    <th>Hàm/Class</th>
+                    <th>File</th>
+                    <th>Mục đích</th>
+                </tr>
+                <tr>
+                    <td><code>parseTimeLspdDepthMapFromTxt()</code></td>
+                    <td>lis_file_parser.dart</td>
+                    <td>Parse TXT thành Map TIME → {DEPTH, LSPD}</td>
+                </tr>
+                <tr>
+                    <td><code>normalizeTableData()</code></td>
+                    <td>lis_file_parser.dart</td>
+                    <td>Chuẩn hóa, sort, hồi quy DEPTH</td>
+                </tr>
+                <tr>
+                    <td><code>_resolveDepthColumn()</code></td>
+                    <td>lis_file_parser.dart</td>
+                    <td>Tìm cột DEPTH hoặc DEPT</td>
+                </tr>
+                <tr>
+                    <td><code>getTableData()</code></td>
+                    <td>lis_file_parser.dart</td>
+                    <td>Lấy dữ liệu bảng từ LIS</td>
+                </tr>
+                <tr>
+                    <td><code>DataTableWidget</code></td>
+                    <td>data_table_widget.dart</td>
+                    <td>UI cho merge function</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>12. Lưu ý quan trọng</h2>
+            
+            <div class="warning">
+                <strong>1. Cột DEPTH trong LIS thực ra là TIME!</strong>
+                <p>Trước merge: DEPTH chứa TIME (milliseconds)</p>
+                <p>Sau merge: DEPTH chứa độ sâu thật (meters)</p>
+            </div>
+
+            <div class="warning">
+                <strong>2. Dữ liệu có thể bị mất!</strong>
+                <p>Các row không khớp TIME với TXT sẽ bị XÓA hoàn toàn</p>
+            </div>
+
+            <div class="warning">
+                <strong>3. DEPTH bị ghi đè hoàn toàn!</strong>
+                <p>Sau normalize, tất cả DEPTH được tính lại theo công thức tuyến tính</p>
+            </div>
+
+            <div class="note">
+                <strong>4. LSPD chỉ merge nếu cả 2 điều kiện:</strong>
+                <ul>
+                    <li>TXT có cột LSPD</li>
+                    <li>LIS có cột SPEE</li>
+                </ul>
+            </div>
+
+            <div class="note">
+                <strong>5. Step chuẩn hóa:</strong>
+                <p>Chỉ chấp nhận: 0.1, 0.5, 1, 2, 5, 10, 20, 50, 100</p>
+                <p>Step thực tế sẽ được làm tròn về giá trị gần nhất</p>
+            </div>
+        </div>
+
+        <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid #e74c3c; text-align: center; color: #7f8c8d;">
+            <p>📄 Document created: November 12, 2025</p>
+            <p>🔧 Flutter LIS Parser Web - mergeDepthToTable Function Documentation</p>
+        </footer>
+    </div>
+</body>
+</html>

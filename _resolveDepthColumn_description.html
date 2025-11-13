@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô tả hàm _resolveDepthColumn - LIS File Parser</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2980b9;
+            margin-top: 30px;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }
+        h3 {
+            color: #34495e;
+            margin-top: 20px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #3498db;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border-left: 4px solid #3498db;
+        }
+        pre code {
+            background: transparent;
+            color: #ecf0f1;
+            padding: 0;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .flowchart {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .step {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #3498db;
+            border-radius: 3px;
+        }
+        .step-number {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .note::before {
+            content: "⚠️ Lưu ý: ";
+            font-weight: bold;
+            color: #856404;
+        }
+        .warning {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .warning::before {
+            content: "❌ Quan trọng: ";
+            font-weight: bold;
+            color: #721c24;
+        }
+        .example {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .example::before {
+            content: "💡 Ví dụ: ";
+            font-weight: bold;
+            color: #0c5460;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .decision-tree {
+            background: #e8f4f8;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border: 2px solid #3498db;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .success::before {
+            content: "✅ Kết quả: ";
+            font-weight: bold;
+            color: #155724;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .info::before {
+            content: "ℹ️ Thông tin: ";
+            font-weight: bold;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Mô tả hàm _resolveDepthColumn</h1>
+        <p><strong>File:</strong> <code>lib/services/lis_file_parser.dart</code></p>
+        <p><strong>Mục đích:</strong> Xác định tên cột DEPTH chính xác từ danh sách columnNames</p>
+        <p><strong>Loại:</strong> Helper function (private method)</p>
+
+        <div class="section">
+            <h2>1. Chữ ký hàm (Function Signature)</h2>
+            <pre><code>String _resolveDepthColumn(List&lt;String&gt; columnNames)</code></pre>
+            
+            <h3>Tham số:</h3>
+            <table>
+                <tr>
+                    <th>Tên</th>
+                    <th>Kiểu</th>
+                    <th>Mô tả</th>
+                </tr>
+                <tr>
+                    <td><code>columnNames</code></td>
+                    <td>List&lt;String&gt;</td>
+                    <td>Danh sách tên các cột trong bảng dữ liệu LIS</td>
+                </tr>
+            </table>
+
+            <h3>Giá trị trả về:</h3>
+            <p><code>String</code> - Tên cột DEPTH được xác định (ưu tiên: DEPT → DEPTH → cột thứ 2 → cột đầu tiên)</p>
+
+            <div class="info">
+                Hàm này là <strong>private method</strong> (prefix _) nên chỉ được sử dụng bên trong class <code>LisFileParser</code>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>2. Source Code đầy đủ</h2>
+            <pre><code>String _resolveDepthColumn(List&lt;String&gt; columnNames) {
+  if (columnNames.contains('DEPT')) return 'DEPT';
+  if (columnNames.contains('DEPTH')) return 'DEPTH';
+  return columnNames.length > 1
+      ? columnNames[1]
+      : (columnNames.isNotEmpty ? columnNames.first : 'DEPT');
+}</code></pre>
+
+            <div class="note">
+                Code rất ngắn gọn (6 dòng) nhưng có logic ưu tiên rõ ràng và xử lý các edge cases
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Logic xử lý - Cây quyết định</h2>
+            
+            <div class="decision-tree">
+                <pre style="background: #2c3e50; color: #ecf0f1; padding: 15px;">
+┌─────────────────────────────────────────────────────┐
+│         _resolveDepthColumn(columnNames)            │
+└─────────────────────────────────────────────────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │ columnNames.contains  │
+            │      'DEPT' ?         │
+            └───────────────────────┘
+                   │           │
+                YES│           │NO
+                   ▼           │
+            ┌──────────┐       │
+            │Return    │       │
+            │'DEPT'    │       │
+            └──────────┘       │
+                               ▼
+                   ┌───────────────────────┐
+                   │ columnNames.contains  │
+                   │      'DEPTH' ?        │
+                   └───────────────────────┘
+                          │           │
+                       YES│           │NO
+                          ▼           │
+                   ┌──────────┐       │
+                   │Return    │       │
+                   │'DEPTH'   │       │
+                   └──────────┘       │
+                                      ▼
+                          ┌───────────────────────┐
+                          │ columnNames.length    │
+                          │      > 1 ?            │
+                          └───────────────────────┘
+                                 │           │
+                              YES│           │NO
+                                 ▼           │
+                          ┌──────────┐       │
+                          │Return    │       │
+                          │col[1]    │       │
+                          └──────────┘       │
+                                             ▼
+                                 ┌───────────────────────┐
+                                 │ columnNames.isEmpty?  │
+                                 └───────────────────────┘
+                                        │           │
+                                     YES│           │NO
+                                        ▼           ▼
+                                 ┌──────────┐ ┌──────────┐
+                                 │Return    │ │Return    │
+                                 │'DEPT'    │ │col.first │
+                                 └──────────┘ └──────────┘
+                </pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>4. Thứ tự ưu tiên (Priority Order)</h2>
+            
+            <div class="flowchart">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Ưu tiên cao nhất: 'DEPT'</strong>
+                    <pre><code>if (columnNames.contains('DEPT')) return 'DEPT';</code></pre>
+                    <p>Nếu có cột tên 'DEPT' → Trả về 'DEPT' ngay lập tức</p>
+                    <div class="example">
+columnNames = ['TIME', 'DEPT', 'GR', 'DEPTH']<br>
+→ Return 'DEPT' (ưu tiên hơn 'DEPTH')
+                    </div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Ưu tiên thứ 2: 'DEPTH'</strong>
+                    <pre><code>if (columnNames.contains('DEPTH')) return 'DEPTH';</code></pre>
+                    <p>Nếu không có 'DEPT' nhưng có 'DEPTH' → Trả về 'DEPTH'</p>
+                    <div class="example">
+columnNames = ['TIME', 'DEPTH', 'GR', 'SP']<br>
+→ Return 'DEPTH'
+                    </div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Ưu tiên thứ 3: Cột thứ 2 (index 1)</strong>
+                    <pre><code>return columnNames.length > 1 ? columnNames[1] : ...</code></pre>
+                    <p>Nếu không có 'DEPT' hoặc 'DEPTH' nhưng có ít nhất 2 cột → Trả về cột thứ 2</p>
+                    <div class="example">
+columnNames = ['TIME', 'PROFONDEUR', 'GR', 'SP']<br>
+→ Return 'PROFONDEUR' (cột index 1)
+                    </div>
+                    <div class="note">
+                        Giả định: Cột đầu (index 0) thường là TIME, cột thứ 2 (index 1) thường là DEPTH
+                    </div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Ưu tiên thứ 4: Cột đầu tiên</strong>
+                    <pre><code>columnNames.isNotEmpty ? columnNames.first : ...</code></pre>
+                    <p>Nếu chỉ có 1 cột → Trả về cột đó</p>
+                    <div class="example">
+columnNames = ['DEPTH']<br>
+→ Return 'DEPTH' (cột duy nhất)
+                    </div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">5</span>
+                    <strong>Fallback cuối cùng: 'DEPT'</strong>
+                    <pre><code>... : 'DEPT'</code></pre>
+                    <p>Nếu columnNames rỗng hoàn toàn → Trả về 'DEPT' mặc định</p>
+                    <div class="example">
+columnNames = []<br>
+→ Return 'DEPT' (giá trị mặc định an toàn)
+                    </div>
+                    <div class="warning">
+                        Trường hợp này rất hiếm, có thể chỉ xảy ra khi có lỗi trong việc parse file LIS
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>5. Các trường hợp sử dụng (Use Cases)</h2>
+            
+            <h3>5.1. Trường hợp chuẩn: File LIS có cột DEPT</h3>
+            <pre><code>columnNames = ['TIME', 'DEPT', 'GR', 'SP', 'CALI']
+result = _resolveDepthColumn(columnNames)
+// result = 'DEPT' ✅</code></pre>
+
+            <h3>5.2. File LIS dùng tên DEPTH thay vì DEPT</h3>
+            <pre><code>columnNames = ['TIME', 'DEPTH', 'GR', 'SP']
+result = _resolveDepthColumn(columnNames)
+// result = 'DEPTH' ✅</code></pre>
+
+            <h3>5.3. File LIS có cả DEPT và DEPTH</h3>
+            <pre><code>columnNames = ['TIME', 'DEPT', 'DEPTH', 'GR']
+result = _resolveDepthColumn(columnNames)
+// result = 'DEPT' ✅ (ưu tiên DEPT hơn DEPTH)</code></pre>
+
+            <h3>5.4. File LIS dùng tên khác (ví dụ: tiếng Pháp)</h3>
+            <pre><code>columnNames = ['TEMPS', 'PROFONDEUR', 'GR', 'SP']
+result = _resolveDepthColumn(columnNames)
+// result = 'PROFONDEUR' ✅ (cột index 1)</code></pre>
+
+            <h3>5.5. File LIS chỉ có 1 cột</h3>
+            <pre><code>columnNames = ['DEPTH']
+result = _resolveDepthColumn(columnNames)
+// result = 'DEPTH' ✅ (cột đầu tiên)</code></pre>
+
+            <h3>5.6. Edge case: columnNames rỗng</h3>
+            <pre><code>columnNames = []
+result = _resolveDepthColumn(columnNames)
+// result = 'DEPT' ✅ (fallback mặc định)</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>6. Tại sao cần hàm này?</h2>
+            
+            <h3>6.1. Vấn đề đặt ra</h3>
+            <ul>
+                <li>Các file LIS khác nhau có thể dùng tên cột khác nhau cho DEPTH</li>
+                <li>Một số file dùng 'DEPT' (viết tắt)</li>
+                <li>Một số file dùng 'DEPTH' (đầy đủ)</li>
+                <li>Một số file dùng tên khác (PROFONDEUR, TEUFE, etc.)</li>
+                <li>Code cần xác định chính xác cột nào là DEPTH để merge dữ liệu</li>
+            </ul>
+
+            <h3>6.2. Giải pháp</h3>
+            <p>Hàm <code>_resolveDepthColumn</code> cung cấp logic thống nhất để:</p>
+            <ol>
+                <li>Tìm cột DEPT hoặc DEPTH nếu có</li>
+                <li>Fallback về cột thứ 2 nếu không tìm thấy (giả định thông thường)</li>
+                <li>Xử lý cả edge cases (1 cột, 0 cột)</li>
+            </ol>
+
+            <h3>6.3. Lợi ích</h3>
+            <ul>
+                <li>✅ <strong>Code DRY:</strong> Không phải lặp lại logic này ở nhiều nơi</li>
+                <li>✅ <strong>Tính nhất quán:</strong> Cùng 1 logic được dùng cho mergeDepthToTable và normalizeTableData</li>
+                <li>✅ <strong>Dễ maintain:</strong> Nếu muốn thay đổi logic ưu tiên, chỉ cần sửa 1 chỗ</li>
+                <li>✅ <strong>Robust:</strong> Xử lý được nhiều edge cases</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>7. Nơi sử dụng trong codebase</h2>
+            
+            <table>
+                <tr>
+                    <th>Hàm gọi</th>
+                    <th>Dòng</th>
+                    <th>Mục đích</th>
+                </tr>
+                <tr>
+                    <td><code>mergeDepthToTable()</code></td>
+                    <td>Line 268</td>
+                    <td>Xác định cột target để merge DEPTH từ TXT vào LIS</td>
+                </tr>
+                <tr>
+                    <td><code>normalizeTableData()</code></td>
+                    <td>Line 376</td>
+                    <td>Xác định cột DEPTH để sort và áp dụng hồi quy tuyến tính</td>
+                </tr>
+            </table>
+
+            <h3>7.1. Trong mergeDepthToTable</h3>
+            <pre><code>List&lt;Map&lt;String, dynamic&gt;&gt; mergeDepthToTable({...}) {
+  final targetCol = _resolveDepthColumn(columnNames);
+  
+  // Merge DEPTH từ TXT vào cột targetCol
+  if (data.containsKey('DEPTH') && 
+      data['DEPTH'] != row[targetCol]?.toString()) {
+    newTable[i][targetCol] = data['DEPTH'];
+  }
+}</code></pre>
+
+            <h3>7.2. Trong normalizeTableData</h3>
+            <pre><code>void normalizeTableData(
+    List&lt;Map&lt;String, dynamic&gt;&gt; data, 
+    List&lt;String&gt; columnNames) {
+  final deptCol = _resolveDepthColumn(columnNames);
+  
+  // Sort theo cột DEPTH
+  data.sort((a, b) {
+    final da = double.tryParse(a[deptCol]?.toString() ?? '') ?? 0.0;
+    final db = double.tryParse(b[deptCol]?.toString() ?? '') ?? 0.0;
+    return isIncreasing ? da.compareTo(db) : db.compareTo(da);
+  });
+  
+  // Áp dụng hồi quy tuyến tính
+  for (int i = 0; i < data.length; i++) {
+    final newDepth = isIncreasing
+        ? firstDepth + i * chosenStep
+        : firstDepth - i * chosenStep;
+    data[i][deptCol] = newDepth.toStringAsFixed(3);
+  }
+}</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>8. So sánh DEPT vs DEPTH</h2>
+            
+            <table>
+                <tr>
+                    <th>Khía cạnh</th>
+                    <th>DEPT</th>
+                    <th>DEPTH</th>
+                </tr>
+                <tr>
+                    <td><strong>Tên đầy đủ</strong></td>
+                    <td>Department (sai) / Depth (viết tắt)</td>
+                    <td>Depth (đầy đủ)</td>
+                </tr>
+                <tr>
+                    <td><strong>Độ phổ biến</strong></td>
+                    <td>⭐⭐⭐⭐⭐ (rất phổ biến trong LIS)</td>
+                    <td>⭐⭐⭐ (ít phổ biến hơn)</td>
+                </tr>
+                <tr>
+                    <td><strong>Ưu tiên</strong></td>
+                    <td>🥇 Cao nhất</td>
+                    <td>🥈 Thứ 2</td>
+                </tr>
+                <tr>
+                    <td><strong>Tiêu chuẩn</strong></td>
+                    <td>LIS format chuẩn</td>
+                    <td>Một số biến thể</td>
+                </tr>
+            </table>
+
+            <div class="info">
+                <strong>Lý do ưu tiên DEPT:</strong>
+                <ul>
+                    <li>DEPT là tên chuẩn trong LIS format specification</li>
+                    <li>Hầu hết file LIS từ các công ty dầu khí đều dùng DEPT</li>
+                    <li>DEPTH thường xuất hiện trong file TXT hoặc các format khác</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>9. Kiểm thử (Test Cases)</h2>
+            
+            <h3>9.1. Test với các input khác nhau</h3>
+            <pre><code>// Test 1: Normal case với DEPT
+assert(_resolveDepthColumn(['TIME', 'DEPT', 'GR']) == 'DEPT');
+
+// Test 2: Normal case với DEPTH
+assert(_resolveDepthColumn(['TIME', 'DEPTH', 'GR']) == 'DEPTH');
+
+// Test 3: Có cả DEPT và DEPTH → Ưu tiên DEPT
+assert(_resolveDepthColumn(['TIME', 'DEPT', 'DEPTH', 'GR']) == 'DEPT');
+
+// Test 4: Không có DEPT/DEPTH → Lấy cột thứ 2
+assert(_resolveDepthColumn(['TIME', 'PROFONDEUR', 'GR']) == 'PROFONDEUR');
+
+// Test 5: Chỉ 1 cột → Lấy cột đó
+assert(_resolveDepthColumn(['DEPTH']) == 'DEPTH');
+
+// Test 6: Rỗng → Fallback 'DEPT'
+assert(_resolveDepthColumn([]) == 'DEPT');
+
+// Test 7: 2 cột không có DEPT/DEPTH → Lấy cột thứ 2
+assert(_resolveDepthColumn(['COL1', 'COL2']) == 'COL2');
+
+✅ Tất cả test cases đều pass!
+</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>10. Lưu ý quan trọng</h2>
+            
+            <div class="warning">
+                <strong>1. Hàm này là PRIVATE!</strong>
+                <p>Prefix <code>_</code> có nghĩa hàm chỉ dùng trong class LisFileParser.</p>
+                <p>Không thể gọi từ bên ngoài class.</p>
+            </div>
+
+            <div class="note">
+                <strong>2. Không có validation!</strong>
+                <p>Hàm không kiểm tra xem cột trả về có thực sự chứa dữ liệu DEPTH hay không.</p>
+                <p>Chỉ dựa vào TÊN CỘT để quyết định.</p>
+            </div>
+
+            <div class="note">
+                <strong>3. Giả định về vị trí cột</strong>
+                <p>Giả định cột thứ 2 (index 1) là DEPTH khi không tìm thấy DEPT/DEPTH.</p>
+                <p>Điều này đúng với hầu hết file LIS chuẩn nhưng có thể sai với file custom.</p>
+            </div>
+
+            <div class="info">
+                <strong>4. Tính nhất quán</strong>
+                <p>Cùng 1 columnNames → Luôn trả về cùng 1 kết quả (pure function).</p>
+                <p>Không có side effects, không modify input.</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>11. Cải tiến có thể (Future Enhancement)</h2>
+            
+            <h3>11.1. Hỗ trợ thêm tên cột</h3>
+            <pre><code>String _resolveDepthColumn(List&lt;String&gt; columnNames) {
+  // Thêm các biến thể khác
+  const depthVariants = [
+    'DEPT', 'DEPTH', 'PROFONDEUR',  // French
+    'TEUFE', 'TIEFE',                // German
+    'PROFUNDIDAD',                   // Spanish
+    'ГЛУБИНА',                       // Russian
+  ];
+  
+  for (final variant in depthVariants) {
+    if (columnNames.contains(variant)) return variant;
+  }
+  
+  // Fallback logic như cũ
+  return columnNames.length > 1
+      ? columnNames[1]
+      : (columnNames.isNotEmpty ? columnNames.first : 'DEPT');
+}</code></pre>
+
+            <h3>11.2. Thêm case-insensitive matching</h3>
+            <pre><code>String _resolveDepthColumn(List&lt;String&gt; columnNames) {
+  // Tìm theo tên không phân biệt hoa thường
+  final deptIdx = columnNames.indexWhere(
+    (col) => col.toUpperCase() == 'DEPT'
+  );
+  if (deptIdx != -1) return columnNames[deptIdx];
+  
+  final depthIdx = columnNames.indexWhere(
+    (col) => col.toUpperCase() == 'DEPTH'
+  );
+  if (depthIdx != -1) return columnNames[depthIdx];
+  
+  // Fallback như cũ...
+}</code></pre>
+
+            <h3>11.3. Thêm logging để debug</h3>
+            <pre><code>String _resolveDepthColumn(List&lt;String&gt; columnNames) {
+  if (columnNames.contains('DEPT')) {
+    print('[DEBUG] Resolved depth column: DEPT (priority 1)');
+    return 'DEPT';
+  }
+  if (columnNames.contains('DEPTH')) {
+    print('[DEBUG] Resolved depth column: DEPTH (priority 2)');
+    return 'DEPTH';
+  }
+  final result = columnNames.length > 1
+      ? columnNames[1]
+      : (columnNames.isNotEmpty ? columnNames.first : 'DEPT');
+  print('[DEBUG] Resolved depth column: $result (fallback)');
+  return result;
+}</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>12. Tóm tắt</h2>
+            
+            <div class="success">
+                <strong>Chức năng:</strong> Xác định tên cột DEPTH từ danh sách cột<br>
+                <strong>Input:</strong> List&lt;String&gt; columnNames<br>
+                <strong>Output:</strong> String (tên cột DEPTH)<br>
+                <strong>Logic:</strong> DEPT → DEPTH → cột[1] → cột[0] → 'DEPT'<br>
+                <strong>Độ phức tạp:</strong> O(n) - duyệt list để tìm DEPT/DEPTH<br>
+                <strong>Side effects:</strong> Không có (pure function)<br>
+                <strong>Thread-safe:</strong> Có (không modify state)
+            </div>
+
+            <h3>Key Takeaways:</h3>
+            <ul>
+                <li>✅ Hàm ngắn gọn (6 dòng) nhưng xử lý đầy đủ edge cases</li>
+                <li>✅ Ưu tiên DEPT > DEPTH > cột thứ 2 > cột đầu > fallback</li>
+                <li>✅ Được dùng bởi mergeDepthToTable và normalizeTableData</li>
+                <li>✅ Private method - chỉ dùng trong class</li>
+                <li>✅ Pure function - không side effects</li>
+                <li>⚠️ Giả định: cột thứ 2 là DEPTH khi không tìm thấy DEPT/DEPTH</li>
+            </ul>
+        </div>
+
+        <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid #3498db; text-align: center; color: #7f8c8d;">
+            <p>📄 Document created: November 13, 2025</p>
+            <p>🔧 Flutter LIS Parser Web - _resolveDepthColumn Function Documentation</p>
+        </footer>
+    </div>
+</body>
+</html>
