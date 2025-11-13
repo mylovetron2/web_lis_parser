@@ -38,6 +38,14 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
   Map<String, dynamic>? splitResult;
   bool showSplitOptions = false;
 
+  // Dữ liệu bảng
+  List<List<String>> tableData = [];
+  List<String> headerList = [];
+
+  // Phân trang
+  int currentPage = 0;
+  int rowsPerPage = 50;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +90,9 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
       downTrendData.clear();
       stableTrendData.clear();
       splitResult = null;
+      tableData.clear();
+      headerList.clear();
+      currentPage = 0; // Reset về trang đầu
     });
 
     try {
@@ -105,6 +116,10 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
       if (dataRows.isEmpty) {
         throw Exception('Không có dữ liệu hợp lệ để vẽ!');
       }
+
+      // Lưu dữ liệu bảng
+      headerList = txtResult['headerList'] ?? [];
+      tableData = dataRows;
 
       // Tách file dựa trên cột DIR nếu có
       Map<String, dynamic> splitFileResult;
@@ -317,21 +332,22 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Layout chính: Chart bên trái, thông tin bên phải
+            // Layout chính: Bảng dữ liệu bên trái, đồ thị và thông tin bên phải
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Đồ thị bên trái (70% chiều rộng)
+                  // Bảng dữ liệu bên trái (30% chiều rộng)
                   Expanded(
-                    flex: 7,
+                    flex: 30,
                     child: Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Biểu đồ phân tích TXT',
+                              'Dữ liệu TXT',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -343,7 +359,56 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
                               child: selectedTxtFile == null
                                   ? const Center(
                                       child: Text(
-                                        'Vui lòng chọn file TXT để hiển thị biểu đồ',
+                                        'Chưa có dữ liệu',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    )
+                                  : isLoading
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : errorMessage.isNotEmpty
+                                  ? const Center(
+                                      child: Text(
+                                        'Có lỗi xảy ra',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    )
+                                  : _buildDataTable(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 16),
+
+                  // Đồ thị ở giữa (40% chiều rộng)
+                  Expanded(
+                    flex: 40,
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Biểu đồ phân tích',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[800],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Expanded(
+                              child: selectedTxtFile == null
+                                  ? const Center(
+                                      child: Text(
+                                        'Vui lòng chọn file TXT',
                                         style: TextStyle(
                                           fontSize: 16,
                                           color: Colors.grey,
@@ -404,7 +469,7 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
 
                   // Thông tin bên phải (30% chiều rộng)
                   Expanded(
-                    flex: 3,
+                    flex: 30,
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -705,6 +770,139 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
           touchTooltipData: LineTouchTooltipData(getTooltipItems: (_) => []),
         ),
       ),
+    );
+  }
+
+  Widget _buildDataTable() {
+    if (tableData.isEmpty) {
+      return const Center(child: Text('Không có dữ liệu'));
+    }
+
+    // Tính toán phân trang
+    final totalRows = tableData.length;
+    final totalPages = (totalRows / rowsPerPage).ceil();
+    final startIndex = currentPage * rowsPerPage;
+    final endIndex = (startIndex + rowsPerPage).clamp(0, totalRows);
+    final displayData = tableData.sublist(startIndex, endIndex);
+
+    return Column(
+      children: [
+        // Thông tin phân trang
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Hiển thị ${startIndex + 1}-$endIndex / $totalRows dòng',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              Row(
+                children: [
+                  Text('Dòng/trang:', style: const TextStyle(fontSize: 12)),
+                  const SizedBox(width: 8),
+                  DropdownButton<int>(
+                    value: rowsPerPage,
+                    items: [25, 50, 100, 200].map((value) {
+                      return DropdownMenuItem<int>(
+                        value: value,
+                        child: Text('$value'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          rowsPerPage = value;
+                          currentPage = 0; // Reset về trang đầu
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Bảng dữ liệu
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 20,
+                headingRowColor: WidgetStateProperty.all(Colors.blue[50]),
+                columns: headerList.map((header) {
+                  return DataColumn(
+                    label: Text(
+                      header,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                rows: displayData.map((row) {
+                  return DataRow(
+                    cells: row.map((cell) {
+                      return DataCell(
+                        Text(cell, style: const TextStyle(fontSize: 11)),
+                      );
+                    }).toList(),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
+
+        // Điều khiển phân trang
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.first_page),
+                onPressed: currentPage > 0
+                    ? () => setState(() => currentPage = 0)
+                    : null,
+                tooltip: 'Trang đầu',
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: currentPage > 0
+                    ? () => setState(() => currentPage--)
+                    : null,
+                tooltip: 'Trang trước',
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Trang ${currentPage + 1} / $totalPages',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: currentPage < totalPages - 1
+                    ? () => setState(() => currentPage++)
+                    : null,
+                tooltip: 'Trang sau',
+              ),
+              IconButton(
+                icon: const Icon(Icons.last_page),
+                onPressed: currentPage < totalPages - 1
+                    ? () => setState(() => currentPage = totalPages - 1)
+                    : null,
+                tooltip: 'Trang cuối',
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

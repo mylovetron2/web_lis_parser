@@ -151,54 +151,156 @@ class LisFileParser {
   Map<String, Map<String, String>> parseTimeLspdDepthMapFromTxt(
     String txtContent,
   ) {
+    print('[DEBUG][parseTimeLspdDepthMapFromTxt] Bắt đầu parse TXT');
     final lines = txtContent
         .split(RegExp(r'\r?\n'))
         .where((l) => l.trim().isNotEmpty)
         .toList();
+
+    print('[DEBUG][parseTimeLspdDepthMapFromTxt] Số dòng: ${lines.length}');
+
     if (lines.length < 2) {
+      print('[DEBUG][parseTimeLspdDepthMapFromTxt] File quá ngắn (< 2 dòng)');
       return {};
     }
+
+    // In 10 dòng đầu để debug
+    print('[DEBUG][parseTimeLspdDepthMapFromTxt] 10 dòng đầu:');
+    for (int i = 0; i < lines.length && i < 10; i++) {
+      print('  Line $i: [${lines[i]}]');
+    }
+
     int headerIdx = -1;
     List<String> txtHeader = [];
+
+    // Tìm dòng header - chấp nhận cả TIME và DEPT/DEPTH
+    // Ưu tiên dòng có ít cột hơn (header thật, không phải title)
     for (int i = 0; i < lines.length; ++i) {
-      final cols = lines[i]
+      // Trim dòng trước khi split để loại bỏ khoảng trắng đầu/cuối
+      final trimmedLine = lines[i].trim();
+      final cols = trimmedLine
           .split(RegExp(r'\s+|,|;|\t'))
+          .where((e) => e.trim().isNotEmpty)
           .map((e) => e.trim().toUpperCase())
           .toList();
+
+      if (i < 10) {
+        print(
+          '[DEBUG][parseTimeLspdDepthMapFromTxt] Dòng $i có ${cols.length} cột: $cols',
+        );
+      }
+
+      // Chỉ chấp nhận header nếu:
+      // 1. Có cả TIME và (DEPTH hoặc DEPT)
+      // 2. Số cột <= 10 (để loại bỏ title có nhiều từ như "DEPTH - TIME - RECORDER LOGGING...")
       if (cols.contains('TIME') &&
-          (cols.contains('DEPTH') || cols.contains('DEPT'))) {
+          (cols.contains('DEPTH') || cols.contains('DEPT')) &&
+          cols.length <= 10) {
         headerIdx = i;
-        txtHeader = lines[i]
+        // Lưu lại header không uppercase để giữ nguyên định dạng
+        txtHeader = trimmedLine
             .split(RegExp(r'\s+|,|;|\t'))
+            .where((e) => e.trim().isNotEmpty)
             .map((e) => e.trim())
             .toList();
+        print(
+          '[DEBUG][parseTimeLspdDepthMapFromTxt] Tìm thấy header ở dòng $i: $txtHeader',
+        );
         break;
       }
     }
+
     if (headerIdx == -1) {
+      print(
+        '[DEBUG][parseTimeLspdDepthMapFromTxt] KHÔNG tìm thấy header với TIME và DEPTH/DEPT',
+      );
       return {};
     }
+
     final timeIdx = txtHeader.indexWhere((c) => c.toUpperCase() == 'TIME');
     int depthIdx = txtHeader.indexWhere((c) => c.toUpperCase() == 'DEPTH');
     if (depthIdx == -1) {
       depthIdx = txtHeader.indexWhere((c) => c.toUpperCase() == 'DEPT');
     }
     final lspdIdx = txtHeader.indexWhere((c) => c.toUpperCase() == 'LSPD');
+
+    print(
+      '[DEBUG][parseTimeLspdDepthMapFromTxt] timeIdx=$timeIdx, depthIdx=$depthIdx, lspdIdx=$lspdIdx',
+    );
+    print('[DEBUG][parseTimeLspdDepthMapFromTxt] Header columns: $txtHeader');
+
     if (timeIdx == -1 || depthIdx == -1) {
+      print(
+        '[DEBUG][parseTimeLspdDepthMapFromTxt] Không tìm thấy cột TIME hoặc DEPTH/DEPT',
+      );
       return {};
     }
+
     final Map<String, Map<String, String>> timeToData = {};
+    int parsedRows = 0;
+    int skippedRows = 0;
+
     for (var i = headerIdx + 1; i < lines.length; ++i) {
-      final row = lines[i].split(RegExp(r'\s+|,|;|\t'));
-      if (row.length > depthIdx && row.length > timeIdx) {
+      // Trim dòng trước khi split
+      final trimmedLine = lines[i].trim();
+      final row = trimmedLine
+          .split(RegExp(r'\s+|,|;|\t'))
+          .where((e) => e.trim().isNotEmpty)
+          .toList();
+
+      if (i == headerIdx + 1) {
+        print(
+          '[DEBUG][parseTimeLspdDepthMapFromTxt] Dòng dữ liệu đầu tiên có ${row.length} cột: $row',
+        );
+        print(
+          '[DEBUG][parseTimeLspdDepthMapFromTxt] Mapping: row[0]=${row.length > 0 ? row[0] : 'N/A'}, row[1]=${row.length > 1 ? row[1] : 'N/A'}, row[2]=${row.length > 2 ? row[2] : 'N/A'}, row[3]=${row.length > 3 ? row[3] : 'N/A'}',
+        );
+        print(
+          '[DEBUG][parseTimeLspdDepthMapFromTxt] Header mapping: [0]=${txtHeader.length > 0 ? txtHeader[0] : 'N/A'}, [1]=${txtHeader.length > 1 ? txtHeader[1] : 'N/A'}, [2]=${txtHeader.length > 2 ? txtHeader[2] : 'N/A'}, [3]=${txtHeader.length > 3 ? txtHeader[3] : 'N/A'}',
+        );
+        print(
+          '[DEBUG][parseTimeLspdDepthMapFromTxt] Sẽ lấy: TIME=row[$timeIdx]=${row[timeIdx]}, DEPTH=row[$depthIdx]=${row[depthIdx]}, LSPD=row[$lspdIdx]=${lspdIdx != -1 && row.length > lspdIdx ? row[lspdIdx] : 'N/A'}',
+        );
+      }
+
+      // Kiểm tra đủ cột
+      if (row.length <= timeIdx || row.length <= depthIdx) {
+        if (skippedRows < 3) {
+          print(
+            '[DEBUG][parseTimeLspdDepthMapFromTxt] Skip dòng $i: không đủ cột (${row.length} cột, cần timeIdx=$timeIdx, depthIdx=$depthIdx)',
+          );
+        }
+        skippedRows++;
+        continue;
+      }
+
+      try {
         final timeSec = parseTimeToSeconds(row[timeIdx]);
         final data = <String, String>{'DEPTH': row[depthIdx]};
+
         if (lspdIdx != -1 && row.length > lspdIdx) {
           data['LSPD'] = row[lspdIdx];
         }
+
         timeToData[timeSec.toString()] = data;
+        parsedRows++;
+
+        if (parsedRows <= 3) {
+          print(
+            '[DEBUG][parseTimeLspdDepthMapFromTxt] Row $parsedRows: TIME=${row[timeIdx]} ($timeSec s) -> $data',
+          );
+        }
+      } catch (e) {
+        if (skippedRows < 3) {
+          print('[DEBUG][parseTimeLspdDepthMapFromTxt] Lỗi parse dòng $i: $e');
+        }
+        skippedRows++;
       }
     }
+
+    print(
+      '[DEBUG][parseTimeLspdDepthMapFromTxt] Đã parse $parsedRows dòng dữ liệu, skip $skippedRows dòng',
+    );
     return timeToData;
   }
 
@@ -274,12 +376,25 @@ class LisFileParser {
     Map<String, Map<String, String>> timeToData = parseTimeLspdDepthMapFromTxt(
       txtContent,
     );
-
-    // Print first 2 lines of txtContent for debugging
-    final txtLines = txtContent.split(RegExp(r'\r?\n'));
-    if (txtLines.length >= 2) {
-      print('[DEBUG] txtContent line 1: ${txtLines[0]}');
-      print('[DEBUG] txtContent line 2: ${txtLines[1]}');
+    // Print first 10 entries of timeToData for debugging
+    if (timeToData.isNotEmpty) {
+      print('[DEBUG] First 10 entries of timeToData:');
+      int count = 0;
+      for (final entry in timeToData.entries) {
+        if (count >= 10) break;
+        print('  TIME: ${entry.key} -> ${entry.value}');
+        count++;
+      }
+    }
+    // Print first 10 entries of timeToData for debugging
+    if (timeToData.isNotEmpty) {
+      print('[DEBUG] First 10 entries of timeToData:');
+      int count = 0;
+      for (final entry in timeToData.entries) {
+        if (count >= 10) break;
+        print('  TIME: ${entry.key} -> ${entry.value}');
+        count++;
+      }
     }
 
     for (int i = newTable.length - 1; i >= 0; --i) {
@@ -578,7 +693,15 @@ class LisFileParser {
     required List<String> columnNames,
     required int startAdrSave,
   }) async {
-    if (file == null) throw Exception('File chưa mở');
+    print(
+      '[DEBUG][saveTableData2Lis] BẮT ĐẦU - tableData.length=${tableData.length}, startAdrSave=$startAdrSave',
+    );
+
+    if (file == null) {
+      print('[DEBUG][saveTableData2Lis] ERROR: File chưa mở!');
+      throw Exception('File chưa mở');
+    }
+
     // Tạo tên file mới với phần mở rộng ngày giờ
     final now = DateTime.now();
     final extIndex = fileName.lastIndexOf('.');
@@ -587,15 +710,23 @@ class LisFileParser {
     final newFileName = extIndex > 0
         ? '${fileName.substring(0, extIndex)}_copy_$timeStr${fileName.substring(extIndex)}'
         : '${fileName}_copy_$timeStr';
+
+    print('[DEBUG][saveTableData2Lis] Tạo file mới: $newFileName');
     final newFile = await File(newFileName).open(mode: FileMode.write);
 
     try {
+      print(
+        '[DEBUG][saveTableData2Lis] Đang copy $startAdrSave bytes từ file gốc...',
+      );
       await file!.setPosition(0);
       final originalBytes = await file!.read(startAdrSave.toInt());
       await newFile.writeFrom(originalBytes);
+      print(
+        '[DEBUG][saveTableData2Lis] Đã copy xong ${originalBytes.length} bytes',
+      );
     } catch (e) {
-      print('Error copying original file: $e');
-      //await newFile.close();
+      print('[DEBUG][saveTableData2Lis] ERROR khi copy file: $e');
+      await newFile.close();
       return;
     }
 
@@ -750,6 +881,7 @@ class LisFileParser {
     }
 
     //CẬP NHẬT ENTRYBLOCK
+    print('[DEBUG][saveTableData2Lis] Đang cập nhật EntryBlock...');
 
     final updatedEntryBlock = EntryBlock();
     if (stepChuanHoa < 0) {
@@ -757,6 +889,11 @@ class LisFileParser {
     } else {
       updatedEntryBlock.nDirection = 255;
     }
+
+    print('[DEBUG][saveTableData2Lis] stepChuanHoa=$stepChuanHoa');
+    print(
+      '[DEBUG][saveTableData2Lis] UPDATE EntryBlock Direction: ${updatedEntryBlock.nDirection}',
+    );
 
     updatedEntryBlock.fFrameSpacing = stepChuanHoa.abs() * 100;
     updatedEntryBlock.nDataFrameSize = entryBlock.nDataFrameSize;
@@ -767,17 +904,20 @@ class LisFileParser {
     updatedEntryBlock.nDepthRepr = entryBlock.nDepthRepr;
     updatedEntryBlock.nDepthRecordingMode = 1; //Cần xem lại
 
-    print('[DEBUG] updatedEntryBlock: $updatedEntryBlock');
-
+    print('[DEBUG][saveTableData2Lis] Encoding EntryBlock...');
     final updateEntryBlockBytes = encodeEntryBlock(updatedEntryBlock);
     int fileOffset = lisRecords[dataFSRIdx].addr + 2;
 
+    print('[DEBUG][saveTableData2Lis] Ghi EntryBlock vào offset $fileOffset');
     await newFile.setPosition(fileOffset);
     await newFile.writeFrom(updateEntryBlockBytes);
 
     //CẬP NHẬT PHẦN CUỐI FILE NẾU CÓ
 
     await newFile.close();
+    print(
+      '[DEBUG][saveTableData2Lis] HOÀN TẤT! File đã được lưu: $newFileName',
+    );
 
     return;
   }
@@ -2409,7 +2549,7 @@ class LisFileParser {
   }
 
   // Get data for table display
-  Future<List<Map<String, dynamic>>> getTableData({int maxRows = 1000}) async {
+  Future<List<Map<String, dynamic>>> getTableData({int maxRows = 10000}) async {
     // ...existing code...
 
     if (!isFileOpen) {
@@ -3210,10 +3350,6 @@ class LisFileParser {
 
                   final speeBytes = CodeReader.encode(speeDouble, 68, 4);
 
-                  print(
-                    '[DEBUG] SPEE value: speeDouble=$speeDouble, speeBytes=${speeBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
-                  );
-
                   // Update SPEE bytes in the frame
                   for (
                     int i = 0;
@@ -3246,9 +3382,9 @@ class LisFileParser {
     // Update EntryBlock
     final updatedEntryBlock = EntryBlock();
     if (stepChuanHoa < 0) {
-      updatedEntryBlock.nDirection = 255;
-    } else {
       updatedEntryBlock.nDirection = 1;
+    } else {
+      updatedEntryBlock.nDirection = 255;
     }
 
     updatedEntryBlock.fFrameSpacing = stepChuanHoa.abs() * 100;
