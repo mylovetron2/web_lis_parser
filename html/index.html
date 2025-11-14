@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIS File Parser - Documentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            padding: 40px 20px;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            padding: 20px;
+        }
+
+        .menu-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .menu-card .icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .menu-card h2 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .menu-card p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.95em;
+        }
+
+        .category {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .category h3 {
+            color: white;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 30px;
+            margin-top: 50px;
+            opacity: 0.8;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 LIS File Parser</h1>
+            <p class="subtitle">Tài liệu kỹ thuật và mô tả luồng xử lý</p>
+        </header>
+
+        <div class="category">
+            <h3>🔄 Data Processing & Merging</h3>
+            <div class="menu-grid">
+                <a href="mergeDepthToTable_description.html" class="menu-card">
+                    <span class="icon">🔗</span>
+                    <h2>Merge Depth to Table</h2>
+                    <p>Mô tả chi tiết luồng merge dữ liệu DEPTH từ file TXT vào tableData. Bao gồm cách parse TXT, khớp TIME, và cập nhật DEPTH/LSPD.</p>
+                    <span class="tag">Core Function</span>
+                </a>
+
+                <a href="merge_data_flow_description.html" class="menu-card">
+                    <span class="icon">🌊</span>
+                    <h2>Merge Data Flow</h2>
+                    <p>Luồng xử lý dữ liệu merge tổng thể từ đầu đến cuối. Mô tả các bước normalize, sort và linear regression.</p>
+                    <span class="tag">Workflow</span>
+                </a>
+
+                <a href="_resolveDepthColumn_description.html" class="menu-card">
+                    <span class="icon">🎯</span>
+                    <h2>Resolve Depth Column</h2>
+                    <p>Logic xác định cột depth đúng trong dữ liệu (DEPT, DEPTH, hoặc cột mặc định).</p>
+                    <span class="tag">Helper</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="category">
+            <h3>📊 Data Reading & Parsing</h3>
+            <div class="menu-grid">
+                <a href="getTableData_description.html" class="menu-card">
+                    <span class="icon">📋</span>
+                    <h2>Get Table Data</h2>
+                    <p>Mô tả cách đọc và trích xuất dữ liệu từ file LIS thành dạng bảng (tableData) để hiển thị trên UI.</p>
+                    <span class="tag">Data Loading</span>
+                </a>
+
+                <a href="parseTimeDepthMapFromTxt_description.html" class="menu-card">
+                    <span class="icon">⏱️</span>
+                    <h2>Parse Time Depth Map</h2>
+                    <p>Parse file TXT để tạo Map TIME → DEPTH. Xử lý nhiều định dạng time và tìm header tự động.</p>
+                    <span class="tag">TXT Parser</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="category">
+            <h3>💾 File Operations</h3>
+            <div class="menu-grid">
+                <a href="download_flow_description.html" class="menu-card">
+                    <span class="icon">⬇️</span>
+                    <h2>Download Flow</h2>
+                    <p>Chi tiết luồng download file LIS đã chỉnh sửa. Bao gồm tính startAdrSave, getModifiedFileBytes, tạo Blob và trigger download.</p>
+                    <span class="tag">Export</span>
+                </a>
+            </div>
+        </div>
+
+        <footer>
+            <p>🚀 LIS File Parser Documentation</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">
+                Generated on November 13, 2025 | Version 1.0
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

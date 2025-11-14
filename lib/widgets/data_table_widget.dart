@@ -191,7 +191,7 @@ class _DataTableWidgetState extends State<DataTableWidget> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Đã merge DEPTH từ TXT cho $matchCount dòng TIME khớp! (Chỉ trong bộ nhớ - không lưu file trên web)',
+              'Đã merge DEPTH từ TXT cho $matchCount dòng TIME khớp!',
             ),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 4),

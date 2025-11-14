@@ -352,13 +352,13 @@ class LisFileParser {
     return timeToDepth;
   }
 
-  String _resolveDepthColumn(List<String> columnNames) {
-    if (columnNames.contains('DEPT')) return 'DEPT';
-    if (columnNames.contains('DEPTH')) return 'DEPTH';
-    return columnNames.length > 1
-        ? columnNames[1]
-        : (columnNames.isNotEmpty ? columnNames.first : 'DEPT');
-  }
+  // String _resolveDepthColumn(List<String> columnNames) {
+  //   if (columnNames.contains('DEPT')) return 'DEPT';
+  //   if (columnNames.contains('DEPTH')) return 'DEPTH';
+  //   return columnNames.length > 1
+  //       ? columnNames[1]
+  //       : (columnNames.isNotEmpty ? columnNames.first : 'DEPT');
+  // }
 
   /// Hàm merge DEPTH từ timeToDepth vào bản sao tableData, trả về tableData mới sau khi merge
   List<Map<String, dynamic>> mergeDepthToTable({
@@ -367,7 +367,8 @@ class LisFileParser {
     required String txtContent,
     required List<String> columnNames,
   }) {
-    final targetCol = _resolveDepthColumn(columnNames);
+    //final targetCol = _resolveDepthColumn(columnNames);
+    final targetCol = "DEPT";
     // Tạo bản sao dữ liệu để không ảnh hưởng dữ liệu gốc
     final newTable = List<Map<String, dynamic>>.from(
       tableData.map((row) => Map<String, dynamic>.from(row)),
@@ -3347,12 +3348,11 @@ class LisFileParser {
       );
       outputBuffer.add(depthBytes);
 
-      depthRecord -= stepChuanHoa * 100;
-
+      //depthRecord -= stepChuanHoa * 100;
       // Write FRAME DATA
       for (int frameIdx = 0; frameIdx < framePerRecordNew; frameIdx++) {
         if (step >= tableData.length) break;
-
+        depthRecord += stepChuanHoa * 100;
         final row = tableData[step];
 
         // Read Adr from tableData to get original frame data

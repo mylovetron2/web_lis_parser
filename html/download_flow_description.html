@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luồng dữ liệu khi download file LIS</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; color: #222; }
+        h1, h2 { color: #2a5d9f; }
+        .section { margin-bottom: 32px; }
+        code, pre { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+        ul, ol { margin-left: 24px; }
+        .step { margin-bottom: 12px; }
+        .highlight { background: #e3f2fd; padding: 2px 4px; border-radius: 3px; }
+        .flowchart { background: #fff; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Mô tả luồng dữ liệu khi nhấn nút Download file LIS</h1>
+    <div class="section">
+        <h2>1. Mục tiêu</h2>
+        <p>Khi người dùng nhấn nút Download, ứng dụng sẽ tạo file LIS mới từ dữ liệu đã chỉnh sửa (tableData) và trigger download file về máy (chỉ khả dụng trên web).</p>
+    </div>
+    <div class="section">
+        <h2>2. Luồng dữ liệu tổng quát</h2>
+        <div class="flowchart">
+            <pre>
+1. Người dùng nhấn nút Download (icon 💾)
+   ↓
+2. UI hiển thị dialog loading "Đang chuẩn bị file để download..."
+   ↓
+3. Tính toán <span class="highlight">startAdrSave</span> (địa chỉ blank record đầu tiên trước data records)
+   ↓
+4. Gọi <span class="highlight">getModifiedFileBytes(tableData, columnNames, startAdrSave)</span>
+   ↓
+5. getModifiedFileBytes xử lý:
+   - Chuẩn hóa dữ liệu (normalizeTableData)
+   - Đọc header file gốc (từ đầu đến startAdrSave)
+   - Tính toán số frame/record, số record cần ghi
+   - Ghi lại blank record và data record cho từng frame
+   - Cập nhật EntryBlock (direction, frame spacing, depth)
+   - Trả về Uint8List (toàn bộ file mới)
+   ↓
+6. Tạo tên file download (getDownloadFileName)
+   ↓
+7. Đóng dialog loading
+   ↓
+8. Nếu là web: gọi <span class="highlight">FileDownloadHelper.downloadFile(bytes, fileName)</span>
+   - Tạo Blob từ bytes
+   - Tạo URL từ Blob
+   - Tạo thẻ &lt;a&gt; và trigger click để download
+   - Dọn dẹp URL
+   ↓
+9. Hiển thị thông báo thành công hoặc lỗi
+            </pre>
+        </div>
+    </div>
+    <div class="section">
+        <h2>3. Chi tiết các bước chính</h2>
+        <ol>
+            <li class="step"><b>Tính startAdrSave:</b>
+                <ul>
+                    <li>Lấy địa chỉ của record đầu tiên trong lisRecords[startDataRec]</li>
+                    <li>Trừ 16 byte để về blank record header</li>
+                    <li>Giá trị này dùng để giữ nguyên phần header file gốc</li>
+                </ul>
+            </li>
+            <li class="step"><b>getModifiedFileBytes:</b>
+                <ul>
+                    <li>Chuẩn hóa tableData (sắp xếp, tính step, regression DEPT)</li>
+                    <li>Đọc toàn bộ file gốc, lấy phần header (0 → startAdrSave)</li>
+                    <li>Tính toán framePerRecordNew và numRec dựa trên tableData.length</li>
+                    <li>Ghi lại từng blank record và data record theo cấu trúc LIS</li>
+                    <li>Cập nhật EntryBlock với direction/step mới</li>
+                    <li>Trả về Uint8List chứa toàn bộ file LIS mới</li>
+                </ul>
+            </li>
+            <li class="step"><b>FileDownloadHelper.downloadFile:</b>
+                <ul>
+                    <li>Tạo Blob từ Uint8List</li>
+                    <li>Tạo object URL từ Blob</li>
+                    <li>Tạo thẻ &lt;a&gt; với href=URL và download=fileName</li>
+                    <li>Trigger click() để download file</li>
+                    <li>Revoke URL để giải phóng bộ nhớ</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    <div class="section">
+        <h2>4. Lưu ý quan trọng</h2>
+        <ul>
+            <li>Download chỉ khả dụng trên <b>web browser</b>, không hỗ trợ desktop.</li>
+            <li>File mới được tạo hoàn toàn từ tableData, không phải chỉnh sửa file gốc.</li>
+            <li>Các thay đổi (edit cell, merge DEPTH/SPEE) đều được áp dụng vào file mới.</li>
+            <li>EntryBlock được cập nhật lại direction và step dựa trên dữ liệu đã chuẩn hóa.</li>
+        </ul>
+    </div>
+    <div class="section">
+        <h2>5. Sơ đồ luồng dữ liệu</h2>
+        <pre>
+tableData (đã edit/merge)
+    │
+    ↓
+[Chuẩn hóa: sort, step, regression]
+    │
+    ↓
+[Đọc header file gốc (0 → startAdrSave)]
+    │
+    ↓
+[Tính framePerRecordNew, numRec]
+    │
+    ↓
+[Ghi blank record + data record cho từng frame]
+    │
+    ↓
+[Cập nhật EntryBlock]
+    │
+    ↓
+[Uint8List: file LIS mới hoàn chỉnh]
+    │
+    ↓
+[Tạo Blob → URL → trigger download]
+    │
+    ↓
+File LIS mới được tải về máy
+        </pre>
+    </div>
+    <div class="section">
+        <h2>6. Vị trí code chính</h2>
+        <ul>
+            <li><code>lib/widgets/data_table_widget.dart</code>: _downloadModifiedFile()</li>
+            <li><code>lib/services/lis_file_parser.dart</code>: getModifiedFileBytes()</li>
+            <li><code>lib/utils/file_download_helper.dart</code>: downloadFile()</li>
+        </ul>
+    </div>
+</body>
+</html>
