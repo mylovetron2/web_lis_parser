@@ -488,7 +488,8 @@ class LisFileParser {
     }
 
     // 1. Xác định xu hướng chính (tăng hoặc giảm)
-    final deptCol = _resolveDepthColumn(columnNames);
+    //final deptCol = _resolveDepthColumn(columnNames);
+    final deptCol = "DEPT";
     final deptValues = data
         .map((row) => double.tryParse(row[deptCol]?.toString() ?? '') ?? 0.0)
         .toList();
@@ -538,25 +539,102 @@ class LisFileParser {
           .key;
     }
 
-    // 4. Ép về step chuẩn (0.1, 0.5, 1, 10, 20 ...)
-    final allowedSteps = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100];
-    double chosenStep = allowedSteps
-        .reduce((a, b) => (mainStep - a).abs() < (mainStep - b).abs() ? a : b)
-        .toDouble();
-    //stepChuanHoa = chosenStep;
-    stepChuanHoa = isIncreasing ? chosenStep : -chosenStep;
-
-    // 5. Làm tròn Depth đầu tiên
-    firstDepth = double.tryParse(data.first[deptCol]?.toString() ?? '') ?? 0.0;
-    firstDepth = double.parse(firstDepth.toStringAsFixed(2));
-
-    // 6. Hồi quy tuyến tính để xử lý DEPT theo step chính (in-place)
-    for (int i = 0; i < data.length; i++) {
-      final newDepth = isIncreasing
-          ? firstDepth + i * chosenStep
-          : firstDepth - i * chosenStep;
-      data[i][deptCol] = newDepth.toStringAsFixed(3);
+    // 4. Sử dụng stepChuanHoa nếu đã được tính, nếu không thì tính mới
+    double chosenStep;
+    if (stepChuanHoa != 0.0) {
+      // Sử dụng stepChuanHoa đã có (lấy abs vì cần giá trị dương để tính toán)
+      chosenStep = stepChuanHoa.abs();
+      print(
+        '[DEBUG][normalizeTableData] Sử dụng stepChuanHoa đã có: $stepChuanHoa (chosenStep=$chosenStep)',
+      );
+    } else {
+      // Tính mới: Ép về step chuẩn (0.1, 0.5, 1, 10, 20 ...)
+      final allowedSteps = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100];
+      chosenStep = allowedSteps
+          .reduce((a, b) => (mainStep - a).abs() < (mainStep - b).abs() ? a : b)
+          .toDouble();
+      stepChuanHoa = isIncreasing ? chosenStep : -chosenStep;
+      print(
+        '[DEBUG][normalizeTableData] Tính stepChuanHoa mới: mainStep=$mainStep, chosenStep=$chosenStep, stepChuanHoa=$stepChuanHoa',
+      );
     }
+
+    // 5. Tạo dữ liệu mới với DEPT chuẩn hóa và chèn thêm các giá trị trung gian
+    final startDepth =
+        double.tryParse(data.first[deptCol]?.toString() ?? '') ?? 0.0;
+    final endDepth =
+        double.tryParse(data.last[deptCol]?.toString() ?? '') ?? 0.0;
+
+    // Làm tròn startDepth theo chosenStep
+    final roundedStart = (startDepth / chosenStep).round() * chosenStep;
+    firstDepth = double.parse(roundedStart.toStringAsFixed(2));
+
+    print(
+      '[DEBUG][normalizeTableData] Original range: $startDepth → $endDepth',
+    );
+    print(
+      '[DEBUG][normalizeTableData] Normalized start: $firstDepth, step: $chosenStep',
+    );
+
+    // 6. Tạo danh sách DEPT chuẩn hóa với step đều
+    final List<double> normalizedDepths = [];
+    double currentDepth = firstDepth;
+    final depthDiff = (endDepth - startDepth).abs();
+    final expectedSteps = (depthDiff / chosenStep).ceil() + 1;
+
+    for (int i = 0; i < expectedSteps; i++) {
+      normalizedDepths.add(currentDepth);
+      currentDepth = isIncreasing
+          ? currentDepth + chosenStep
+          : currentDepth - chosenStep;
+      currentDepth = double.parse(currentDepth.toStringAsFixed(3));
+    }
+
+    print(
+      '[DEBUG][normalizeTableData] Generated ${normalizedDepths.length} normalized depths',
+    );
+
+    // 7. Tạo map từ DEPT gốc → row data để nội suy
+    final Map<double, Map<String, dynamic>> depthToRowMap = {};
+    for (var row in data) {
+      final depth = double.tryParse(row[deptCol]?.toString() ?? '') ?? 0.0;
+      depthToRowMap[depth] = row;
+    }
+
+    // 8. Tạo dữ liệu mới với các DEPT chuẩn hóa
+    final newData = <Map<String, dynamic>>[];
+
+    for (final normalizedDepth in normalizedDepths) {
+      // Tìm row gần nhất trong dữ liệu gốc
+      Map<String, dynamic>? closestRow;
+      double minDistance = double.infinity;
+
+      for (final originalDepth in depthToRowMap.keys) {
+        final distance = (normalizedDepth - originalDepth).abs();
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestRow = depthToRowMap[originalDepth];
+        }
+      }
+
+      if (closestRow != null) {
+        // Tạo row mới với DEPT chuẩn hóa, giữ nguyên các giá trị khác
+        final newRow = Map<String, dynamic>.from(closestRow);
+        newRow[deptCol] = normalizedDepth.toStringAsFixed(3);
+        newData.add(newRow);
+      }
+    }
+
+    // 9. Thay thế data gốc bằng data đã chuẩn hóa
+    data.clear();
+    data.addAll(newData);
+
+    print(
+      '[DEBUG][normalizeTableData] After interpolation: ${data.length} rows (was ${depthToRowMap.length})',
+    );
+    print(
+      '[DEBUG][normalizeTableData] Final range: ${data.first[deptCol]} → ${data.last[deptCol]}',
+    );
   }
 
   /// Đọc dãy byte của frameData từ vị trí bắt đầu
@@ -688,6 +766,7 @@ class LisFileParser {
     return record.addr + 6 + frameIdx * frameLength;
   }
 
+  //Hàm này dùng cho destop
   Future<void> saveTableData2Lis({
     required List<Map<String, dynamic>> tableData,
     required List<String> columnNames,
@@ -2549,7 +2628,9 @@ class LisFileParser {
   }
 
   // Get data for table display
-  Future<List<Map<String, dynamic>>> getTableData({int maxRows = 10000}) async {
+  Future<List<Map<String, dynamic>>> getTableData({
+    int maxRows = 999999999,
+  }) async {
     // ...existing code...
 
     if (!isFileOpen) {

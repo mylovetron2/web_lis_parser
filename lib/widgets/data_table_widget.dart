@@ -24,7 +24,7 @@ class _DataTableWidgetState extends State<DataTableWidget> {
   List<String> columnNames = [];
   bool isLoading = false;
   String errorMessage = '';
-  int maxRows = 500; // Limit rows for performance
+  int maxRows = 100000; // Increased limit - display all data
   int currentPage = 0;
   final int rowsPerPage = 50;
 
@@ -252,7 +252,8 @@ class _DataTableWidgetState extends State<DataTableWidget> {
         return;
       }
 
-      final data = await widget.parser.getTableData(maxRows: maxRows);
+      final data = await widget.parser
+          .getTableData(); // No maxRows limit - get all data
       // Nếu muốn dùng entryBlock để custom hiển thị, có thể chỉnh sửa logic ở đây
       // Retrieved ${data.length} rows of data
 
