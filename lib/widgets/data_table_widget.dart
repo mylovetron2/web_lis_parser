@@ -28,11 +28,7 @@ class _DataTableWidgetState extends State<DataTableWidget> {
   int currentPage = 0;
   final int rowsPerPage = 50;
 
-  // Editing state
-  String? editingCellKey; // Format: "rowIndex_columnName"
-  Map<String, TextEditingController> editControllers = {};
-  Map<String, String> modifiedValues = {}; // Track modified values
-  bool isEditMode = false;
+  // Editing state removed - edit mode no longer supported
 
   @override
   void initState() {
@@ -123,7 +119,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
   Future<void> _mergeByTimeFromTxt() async {
     // Xác định cột độ sâu mục tiêu để merge
     // Không cần xác định targetCol hay originalTable nữa
-    modifiedValues.clear();
     try {
       // Chọn file TXT bằng file picker
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -162,9 +157,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
         tableData = merged;
         columnNames = newColumnNames;
         currentPage = 0; // quay về trang đầu để dễ thấy thay đổi
-        // Clear editing state after merge
-        editingCellKey = null;
-        editControllers.clear();
       });
 
       // Note: File saving is not supported on web
@@ -203,15 +195,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
         SnackBar(content: Text('Lỗi merge: $e'), backgroundColor: Colors.red),
       );
     }
-  }
-
-  @override
-  void dispose() {
-    // Clean up text controllers
-    for (var controller in editControllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
   }
 
   Future<void> _loadTableData() async {
@@ -285,72 +268,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
 
   int get totalPages => (tableData.length / rowsPerPage).ceil();
 
-  void _startEditing(int rowIndex, String columnName, String currentValue) {
-    final cellKey = '${rowIndex}_$columnName';
-
-    // Don't edit array values or DEPTH column
-    if (columnName == 'DEPTH') return;
-
-    setState(() {
-      editingCellKey = cellKey;
-      isEditMode = true;
-    });
-
-    // Create or get controller for this cell
-    if (!editControllers.containsKey(cellKey)) {
-      editControllers[cellKey] = TextEditingController(text: currentValue);
-    } else {
-      editControllers[cellKey]!.text = currentValue;
-    }
-  }
-
-  void _saveEdit(int rowIndex, String columnName) {
-    final cellKey = '${rowIndex}_$columnName';
-    final controller = editControllers[cellKey];
-
-    if (controller != null) {
-      final newValue = controller.text.trim();
-
-      // Validate numeric value
-      if (_isValidNumericValue(newValue)) {
-        // Update the table data locally
-        final actualRowIndex = currentPage * rowsPerPage + rowIndex;
-        if (actualRowIndex < tableData.length) {
-          final numericValue = double.parse(newValue);
-
-          setState(() {
-            tableData[actualRowIndex][columnName] = newValue;
-            modifiedValues[cellKey] = newValue;
-            editingCellKey = null;
-          });
-
-          // Update the parser's pending changes
-          _updateParserData(actualRowIndex, columnName, numericValue);
-
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Updated $columnName value to $newValue'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Invalid numeric value. Please enter a valid number.',
-            ),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _updateParserData(
     int rowIndex,
     String columnName,
@@ -381,163 +298,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
     } catch (e) {
       // Error updating parser data: $e
     }
-  }
-
-  Future<void> _saveAllChangesToFile() async {
-    if (widget.parser.pendingChangesCount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No changes to save'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Save Changes to File'),
-        content: Text(
-          'This will permanently save ${widget.parser.pendingChangesCount} changes to the LIS file.\n\n'
-          'A backup copy will be created automatically.\n\n'
-          '⚠️ Lưu ý: Lưu file không khả dụng trên web browser.\n\n'
-          'Continue?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Save to File'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Saving changes to file...'),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      // Save initiated
-      final success = await widget.parser.savePendingChanges();
-      // Save result: $success
-
-      Navigator.of(context).pop(); // Close loading dialog
-
-      if (success) {
-        setState(() {
-          modifiedValues.clear(); // Clear UI modified state
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Successfully saved all changes to file!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to save changes to file'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      Navigator.of(context).pop(); // Close loading dialog
-
-      // Check if it's the expected web error
-      final errorMsg = e.toString();
-      if (errorMsg.contains('Unsupported') ||
-          errorMsg.contains('UnsupportedError')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Lưu file không khả dụng trên web. Thay đổi chỉ tồn tại trong bộ nhớ.',
-            ),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 4),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving to file: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
-
-  void _cancelEdit() {
-    setState(() {
-      editingCellKey = null;
-      isEditMode = false;
-    });
-  }
-
-  bool _isValidNumericValue(String value) {
-    if (value.isEmpty) return false;
-    return double.tryParse(value) != null;
-  }
-
-  bool _isCellModified(int rowIndex, String columnName) {
-    final cellKey = '${rowIndex}_$columnName';
-    return modifiedValues.containsKey(cellKey);
-  }
-
-  void _resetAllChanges() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset Changes'),
-        content: Text(
-          'Are you sure you want to reset all ${modifiedValues.length} changes?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              setState(() {
-                modifiedValues.clear();
-                editingCellKey = null;
-                isEditMode = false;
-              });
-              Navigator.of(context).pop();
-              _loadTableData(); // Reload original data
-            },
-            child: const Text('Reset'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -603,33 +363,7 @@ class _DataTableWidgetState extends State<DataTableWidget> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const Spacer(),
-                    // Edit mode controls
-                    if (modifiedValues.isNotEmpty) ...[
-                      Chip(
-                        label: Text('${modifiedValues.length} modified'),
-                        backgroundColor: Colors.orange.withOpacity(0.2),
-                        side: BorderSide(color: Colors.orange),
-                      ),
-                      const SizedBox(width: 8),
-                      // Save to file button
-                      IconButton(
-                        onPressed: _saveAllChangesToFile,
-                        icon: const Icon(Icons.save),
-                        tooltip: 'Save changes to LIS file',
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.green.withOpacity(0.1),
-                          foregroundColor: Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _resetAllChanges,
-                        icon: const Icon(Icons.undo),
-                        tooltip: 'Reset all changes',
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    // Nút merge DEPTH theo TIME (luôn hiển thị)
+                    // Nút merge DEPTH theo TIME
                     IconButton(
                       onPressed: _mergeByTimeFromTxt,
                       icon: const Icon(Icons.merge_type),
@@ -643,27 +377,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
                       tooltip: 'Download file đã chỉnh sửa',
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.green.shade100,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Edit mode toggle
-                    IconButton(
-                      onPressed: () {
-                        setState(() {
-                          isEditMode = !isEditMode;
-                          if (!isEditMode) {
-                            editingCellKey = null;
-                          }
-                        });
-                      },
-                      icon: Icon(isEditMode ? Icons.edit_off : Icons.edit),
-                      tooltip: isEditMode
-                          ? 'Exit edit mode'
-                          : 'Enable edit mode',
-                      style: IconButton.styleFrom(
-                        backgroundColor: isEditMode
-                            ? Theme.of(context).colorScheme.primaryContainer
-                            : null,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -713,10 +426,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
                     Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                   columns: [
-                    // Đưa cột nút xóa lên đầu
-                    const DataColumn(
-                      label: Icon(Icons.delete, color: Colors.red, size: 18),
-                    ),
                     ...columnNames.map(
                       (name) => DataColumn(
                         label: Text(
@@ -730,61 +439,12 @@ class _DataTableWidgetState extends State<DataTableWidget> {
                     final rowIndex = entry.key;
                     final row = entry.value;
 
-                    // Tạo danh sách cell dữ liệu cho từng dòng, bắt đầu với nút xóa
-                    final cells = <DataCell>[
-                      DataCell(
-                        IconButton(
-                          icon: Icon(Icons.delete, color: Colors.red, size: 18),
-                          tooltip: 'Xóa dòng',
-                          onPressed: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Xác nhận xóa dòng'),
-                                content: const Text(
-                                  'Bạn có chắc chắn muốn xóa dòng này?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(ctx).pop(false),
-                                    child: const Text('Hủy'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(ctx).pop(true),
-                                    child: const Text(
-                                      'Xóa',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) {
-                              setState(() {
-                                tableData.removeAt(rowIndex);
-                              });
-                              widget.parser.markRowDeleted(rowIndex);
-                            }
-                          },
-                        ),
-                      ),
-                    ];
-                    for (final columnName in columnNames) {
-                      final value = row[columnName] ?? 'N/A';
-                      final cellKey = '${rowIndex}_$columnName';
-                      final isEditing = editingCellKey == cellKey;
-                      final isModified = _isCellModified(rowIndex, columnName);
-                      final canEdit =
-                          isEditMode &&
-                          columnName != 'DEPTH' &&
-                          value != 'NULL' &&
-                          value != 'N/A';
+                    return DataRow(
+                      cells: columnNames.map((columnName) {
+                        final value = row[columnName] ?? 'N/A';
 
-                      if (value is Map && value['isArray'] == true) {
-                        cells.add(
-                          DataCell(
+                        if (value is Map && value['isArray'] == true) {
+                          return DataCell(
                             InkWell(
                               onTap: () => _showWaveformDialog(
                                 context,
@@ -832,145 +492,23 @@ class _DataTableWidgetState extends State<DataTableWidget> {
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      } else if (isEditing) {
-                        cells.add(
-                          DataCell(
-                            SizedBox(
-                              width: 120,
-                              child: TextField(
-                                controller: editControllers[cellKey],
-                                autofocus: true,
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 14,
-                                ),
-                                decoration: InputDecoration(
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.all(8),
-                                  border: OutlineInputBorder(),
-                                  suffixIcon: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        onPressed: () =>
-                                            _saveEdit(rowIndex, columnName),
-                                        icon: Icon(
-                                          Icons.check,
-                                          size: 16,
-                                          color: Colors.green,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        constraints: BoxConstraints(
-                                          minWidth: 24,
-                                          minHeight: 24,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        onPressed: _cancelEdit,
-                                        icon: Icon(
-                                          Icons.close,
-                                          size: 16,
-                                          color: Colors.red,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        constraints: BoxConstraints(
-                                          minWidth: 24,
-                                          minHeight: 24,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                onSubmitted: (_) =>
-                                    _saveEdit(rowIndex, columnName),
-                              ),
-                            ),
-                          ),
-                        );
-                      } else {
-                        cells.add(
-                          DataCell(
-                            InkWell(
-                              onTap: canEdit
-                                  ? () => _startEditing(
-                                      rowIndex,
-                                      columnName,
-                                      value.toString(),
-                                    )
-                                  : null,
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                  horizontal: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isModified
-                                      ? Colors.orange.withOpacity(0.1)
-                                      : canEdit
-                                      ? Theme.of(context)
-                                            .colorScheme
-                                            .surfaceContainer
-                                            .withOpacity(0.5)
-                                      : null,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: canEdit
-                                      ? Border.all(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .outline
-                                              .withOpacity(0.3),
-                                          width: 1,
-                                        )
-                                      : null,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        value.toString(),
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          color:
-                                              value == 'NULL' || value == 'N/A'
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.outline
-                                              : isModified
-                                              ? Colors.orange.shade800
-                                              : null,
-                                          fontWeight: isModified
-                                              ? FontWeight.bold
-                                              : null,
-                                        ),
-                                      ),
-                                    ),
-                                    if (canEdit)
-                                      Icon(
-                                        Icons.edit,
-                                        size: 12,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.outline,
-                                      ),
-                                    if (isModified)
-                                      Icon(
-                                        Icons.circle,
-                                        size: 8,
-                                        color: Colors.orange,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                    }
+                          );
+                        }
 
-                    return DataRow(cells: cells);
+                        // Regular cell - display only
+                        return DataCell(
+                          Text(
+                            value.toString(),
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              color: value == 'NULL' || value == 'N/A'
+                                  ? Theme.of(context).colorScheme.outline
+                                  : null,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
                   }).toList(),
                 ),
               ),
@@ -980,32 +518,6 @@ class _DataTableWidgetState extends State<DataTableWidget> {
 
         // Bottom pagination
         if (totalPages > 1) _buildPaginationControls(),
-
-        // Help text for editing
-        if (isEditMode)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Edit mode: Click numeric cells to edit • DEPTH is read-only • Click Save 💾 to write changes to LIS file',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
       ],
     );
   }
