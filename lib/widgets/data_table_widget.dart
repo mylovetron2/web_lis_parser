@@ -3,7 +3,6 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../services/lis_file_parser.dart';
@@ -80,27 +79,16 @@ class _DataTableWidgetState extends State<DataTableWidget> {
         Navigator.of(context).pop();
       }
 
-      // Trigger download
-      if (kIsWeb) {
-        FileDownloadHelper.downloadFile(modifiedBytes, downloadFileName);
+      // Trigger download on all platforms
+      await FileDownloadHelper.downloadFile(modifiedBytes, downloadFileName);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đã download file: $downloadFileName'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Download chỉ khả dụng trên web browser'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã download file: $downloadFileName'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

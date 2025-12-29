@@ -253,10 +253,10 @@ class LisFileParser {
           '[DEBUG][parseTimeLspdDepthMapFromTxt] Dòng dữ liệu đầu tiên có ${row.length} cột: $row',
         );
         print(
-          '[DEBUG][parseTimeLspdDepthMapFromTxt] Mapping: row[0]=${row.length > 0 ? row[0] : 'N/A'}, row[1]=${row.length > 1 ? row[1] : 'N/A'}, row[2]=${row.length > 2 ? row[2] : 'N/A'}, row[3]=${row.length > 3 ? row[3] : 'N/A'}',
+          '[DEBUG][parseTimeLspdDepthMapFromTxt] Mapping: row[0]=${row.isNotEmpty ? row[0] : 'N/A'}, row[1]=${row.length > 1 ? row[1] : 'N/A'}, row[2]=${row.length > 2 ? row[2] : 'N/A'}, row[3]=${row.length > 3 ? row[3] : 'N/A'}',
         );
         print(
-          '[DEBUG][parseTimeLspdDepthMapFromTxt] Header mapping: [0]=${txtHeader.length > 0 ? txtHeader[0] : 'N/A'}, [1]=${txtHeader.length > 1 ? txtHeader[1] : 'N/A'}, [2]=${txtHeader.length > 2 ? txtHeader[2] : 'N/A'}, [3]=${txtHeader.length > 3 ? txtHeader[3] : 'N/A'}',
+          '[DEBUG][parseTimeLspdDepthMapFromTxt] Header mapping: [0]=${txtHeader.isNotEmpty ? txtHeader[0] : 'N/A'}, [1]=${txtHeader.length > 1 ? txtHeader[1] : 'N/A'}, [2]=${txtHeader.length > 2 ? txtHeader[2] : 'N/A'}, [3]=${txtHeader.length > 3 ? txtHeader[3] : 'N/A'}',
         );
         print(
           '[DEBUG][parseTimeLspdDepthMapFromTxt] Sẽ lấy: TIME=row[$timeIdx]=${row[timeIdx]}, DEPTH=row[$depthIdx]=${row[depthIdx]}, LSPD=row[$lspdIdx]=${lspdIdx != -1 && row.length > lspdIdx ? row[lspdIdx] : 'N/A'}',

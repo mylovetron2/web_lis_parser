@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:html' as html;
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -8,6 +7,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_lis_parser/services/data_processing_service.dart';
 import 'package:flutter_lis_parser/services/file_service.dart';
+import 'package:flutter_lis_parser/utils/file_download_helper.dart';
 //import '../services/services.dart';
 
 class TxtAnalysisScreen extends StatefulWidget {
@@ -219,20 +219,9 @@ class _TxtAnalysisScreenState extends State<TxtAnalysisScreen> {
     }
   }
 
-  void _downloadSplitFile(String content, String fileName) {
-    if (kIsWeb) {
-      final bytes = utf8.encode(content);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.document.createElement('a') as html.AnchorElement
-        ..href = url
-        ..style.display = 'none'
-        ..download = fileName;
-      html.document.body?.children.add(anchor);
-      anchor.click();
-      html.document.body?.children.remove(anchor);
-      html.Url.revokeObjectUrl(url);
-    }
+  Future<void> _downloadSplitFile(String content, String fileName) async {
+    final bytes = utf8.encode(content);
+    await FileDownloadHelper.downloadFile(Uint8List.fromList(bytes), fileName);
   }
 
   Color _getTrendColor(String trend) {
