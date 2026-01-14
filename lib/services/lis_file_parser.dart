@@ -545,8 +545,10 @@ class LisFileParser {
     if (stepChuanHoa != 0.0) {
       // Sử dụng stepChuanHoa đã có (lấy abs vì cần giá trị dương để tính toán)
       chosenStep = stepChuanHoa.abs();
+      // CẬP NHẬT lại dấu của stepChuanHoa theo xu hướng hiện tại
+      stepChuanHoa = isIncreasing ? chosenStep : -chosenStep;
       print(
-        '[DEBUG][normalizeTableData] Sử dụng stepChuanHoa đã có: $stepChuanHoa (chosenStep=$chosenStep)',
+        '[DEBUG][normalizeTableData] Sử dụng stepChuanHoa đã có, cập nhật dấu: chosenStep=$chosenStep, isIncreasing=$isIncreasing, stepChuanHoa=$stepChuanHoa',
       );
     } else {
       // Tính mới: Ép về step chuẩn (0.1, 0.5, 1, 10, 20 ...)
